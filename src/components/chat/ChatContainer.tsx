@@ -208,19 +208,20 @@ function isChartRequest(message: string): boolean {
         };
         
         // Attach current chart data snapshot to this message
+        // Use newUserData (not userData) to get the most recent values
         const assistantMessage: Message = {
           id: (Date.now() + 1).toString(),
           role: 'assistant',
           content: `Here's the ${chartNames[chartRequest]}!`,
           chartToShow: chartRequest as 'netWorth' | 'monthlyCost' | 'totalCost' | 'equity' | 'rentGrowth',
-          snapshotData: chartData && monthlyCosts && totalCostData && userData.homePrice && userData.monthlyRent && userData.downPaymentPercent ? {
+          snapshotData: chartData && monthlyCosts && totalCostData && newUserData.homePrice && newUserData.monthlyRent && newUserData.downPaymentPercent ? {
             chartData: chartData,
             monthlyCosts: monthlyCosts,
             totalCostData: totalCostData,
             inputValues: {
-              homePrice: userData.homePrice,
-              monthlyRent: userData.monthlyRent,
-              downPaymentPercent: userData.downPaymentPercent
+              homePrice: newUserData.homePrice,
+              monthlyRent: newUserData.monthlyRent,
+              downPaymentPercent: newUserData.downPaymentPercent
             }
           } : undefined
         };
@@ -283,7 +284,15 @@ function isChartRequest(message: string): boolean {
           });
         }
         
+        // Important: Calculate charts with the NEW data
         calculateAndShowChart(newUserData);
+        
+        // Log to verify correct values are being used
+        console.log('✅ Charts will be calculated with:', {
+          homePrice: newUserData.homePrice,
+          monthlyRent: newUserData.monthlyRent,
+          downPaymentPercent: newUserData.downPaymentPercent
+        });
       }
     }
   };
