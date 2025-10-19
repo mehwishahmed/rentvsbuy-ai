@@ -123,11 +123,14 @@ const [chartsReady, setChartsReady] = useState(false);
           pdf.setFont('helvetica', 'normal');
         }
         
-        const lines = pdf.splitTextToSize(text, pageWidth - 2 * margin);
-        checkNewPage(lines.length * fontSize * 0.4 + 5);
+        // Remove emojis that cause random symbols
+        const cleanText = text.replace(/[📊🏠💵💰]/g, '').trim();
+        
+        const lines = pdf.splitTextToSize(cleanText, pageWidth - 2 * margin);
+        checkNewPage(lines.length * fontSize * 0.35 + 3);
         
         pdf.text(lines, margin, yPosition);
-        yPosition += lines.length * fontSize * 0.4 + 5;
+        yPosition += lines.length * fontSize * 0.35 + 3;
       };
       
       // Add header
@@ -140,7 +143,7 @@ const [chartsReady, setChartsReady] = useState(false);
         'Incomplete scenario';
       addText(`Scenario: ${scenario}`, 14, true);
       
-      yPosition += 10; // Extra space before conversation
+      yPosition += 5; // Extra space before conversation
       
       // Process each message
       for (const message of messages) {
@@ -165,10 +168,10 @@ const [chartsReady, setChartsReady] = useState(false);
           const chartName = chartNames[message.chartToShow] || message.chartToShow;
           const inputVals = message.snapshotData.inputValues;
           
-          addText(`📊 ${chartName}`, 12, true);
+          addText(`Chart: ${chartName}`, 12, true);
           
           if (inputVals) {
-            addText(`Values: $${inputVals.homePrice.toLocaleString()}, $${inputVals.monthlyRent.toLocaleString()}, ${inputVals.downPaymentPercent}%`, 10);
+            addText(`Home Price: $${inputVals.homePrice.toLocaleString()} | Monthly Rent: $${inputVals.monthlyRent.toLocaleString()} | Down Payment: ${inputVals.downPaymentPercent}%`, 10);
           }
           
           // Try to capture and add chart image
@@ -185,10 +188,10 @@ const [chartsReady, setChartsReady] = useState(false);
               const imgHeight = (canvas.height * imgWidth) / canvas.width;
               
               // Check if we need a new page for the chart
-              checkNewPage(imgHeight + 10);
+              checkNewPage(imgHeight + 5);
               
               pdf.addImage(imgData, 'PNG', margin, yPosition, imgWidth, imgHeight);
-              yPosition += imgHeight + 10;
+              yPosition += imgHeight + 5;
               
             } catch (error) {
               console.log('Could not capture chart image:', error);
@@ -197,7 +200,7 @@ const [chartsReady, setChartsReady] = useState(false);
           }
         }
         
-        yPosition += 5; // Space between messages
+        yPosition += 2; // Space between messages
       }
       
       // Save the PDF
