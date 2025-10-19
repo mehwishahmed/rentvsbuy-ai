@@ -306,26 +306,6 @@ All calculations have been audited and verified to ensure accuracy:
 ✅ **Investment Returns:** Compound returns at 7% annually  
 ✅ **Total Cost Analysis:** Accounts for opportunity cost of down payment  
 
-## 🤝 Contributing
-
-Contributions are welcome! This project is growing and we'd love your help.
-
-### How to Contribute
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
-
-### Development Guidelines
-
-- Follow existing code style and patterns
-- Add tests for new financial calculations
-- Update documentation for new features
-- Test chart rendering thoroughly
-- Ensure AI responses remain natural and helpful
-
 ## 📝 License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
