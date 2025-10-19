@@ -203,7 +203,6 @@ const [chartsReady, setChartsReady] = useState(false);
               yPosition += imgHeight + 5;
               
             } catch (error) {
-              console.log('Could not capture chart image:', error);
               addText('[Chart image could not be captured]', 10);
             }
           }
@@ -288,7 +287,6 @@ function shouldShowChart(aiResponse: string): string | null {
     
     // Extract data from message
     const newUserData = extractUserData(content, userData);
-    console.log('🔍 Extracted data:', newUserData);
     setUserData(newUserData);
     
     // Check if we have all data and if it changed
@@ -304,8 +302,6 @@ function shouldShowChart(aiResponse: string): string | null {
     let freshTotalCostData = totalCostData;
     
     if (hasAllData && dataChanged) {
-      console.log('🔄 Data changed! Recalculating charts with new data...');
-      
       // Calculate fresh data synchronously
       const inputs = {
         homePrice: newUserData.homePrice!,
@@ -374,12 +370,6 @@ function shouldShowChart(aiResponse: string): string | null {
         equity: false,
         rentGrowth: false
       });
-      
-      console.log('✅ Fresh charts calculated with:', {
-        homePrice: newUserData.homePrice,
-        monthlyRent: newUserData.monthlyRent,
-        downPaymentPercent: newUserData.downPaymentPercent
-      });
     }
     
     // Get AI response
@@ -433,7 +423,6 @@ function shouldShowChart(aiResponse: string): string | null {
     
     // If we have all data and haven't calculated yet (initial case, not data change)
     if (hasAllData && !chartsReady && !dataChanged) {
-      console.log('📊 Initial chart generation...');
       calculateAndShowChart(newUserData);
     }
   };
@@ -465,17 +454,9 @@ const handleChipClick = (message: string) => {
     
     // Calculate net worth comparison
     const snapshots = calculateNetWorthComparison(inputs);
-    
-    // DEBUG: Check a few snapshots
-    console.log('=== SNAPSHOT DEBUG ===');
-    console.log('Month 1:', snapshots[0]);
-    console.log('Month 60 (Year 5):', snapshots[59]);
-    console.log('Month 180 (Year 15):', snapshots[179]);
-    console.log('Month 360 (Year 30):', snapshots[359]);
 
     setChartData(snapshots);
     setChartsReady(true); // Mark charts as ready (but don't show yet!)
-    console.log('✅ Charts generated and ready!');
     
     // Calculate monthly costs
     const buying = calculateBuyingCosts(inputs);
@@ -653,6 +634,13 @@ Restart
       
       <ChatInput onSend={handleSendMessage} />
       
+      {/* Footer */}
+      <div className="chat-footer">
+        <span>RentVsBuy.ai v1.0</span>
+        <span>•</span>
+        <span>Built with AI-powered insights</span>
+      </div>
+      
       {/* Restart Confirmation Modal */}
       {showRestartModal && (
         <div className="modal-overlay" onClick={() => setShowRestartModal(false)}>
@@ -772,9 +760,6 @@ function extractUserData(message: string, currentData: UserData): UserData {
   };
   
   const allNumbers = extractAllNumbers(message);
-  console.log('🔍 Found numbers:', allNumbers);
-  console.log('🔄 Is new data?', isNewData);
-  console.log('📝 Message:', lowerMessage);
   
   // If only one number, use context clues
   if (allNumbers.length === 1) {
