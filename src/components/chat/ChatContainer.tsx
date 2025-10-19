@@ -33,6 +33,12 @@ interface Message {
       finalHomeValue: number;
       finalInvestmentValue: number;
     };
+    // Store the input values that created this chart
+    inputValues: {
+      homePrice: number;
+      monthlyRent: number;
+      downPaymentPercent: number;
+    };
   };
 }
 
@@ -207,10 +213,15 @@ function isChartRequest(message: string): boolean {
           role: 'assistant',
           content: `Here's the ${chartNames[chartRequest]}!`,
           chartToShow: chartRequest as 'netWorth' | 'monthlyCost' | 'totalCost' | 'equity' | 'rentGrowth',
-          snapshotData: chartData && monthlyCosts && totalCostData ? {
+          snapshotData: chartData && monthlyCosts && totalCostData && userData.homePrice && userData.monthlyRent && userData.downPaymentPercent ? {
             chartData: chartData,
             monthlyCosts: monthlyCosts,
-            totalCostData: totalCostData
+            totalCostData: totalCostData,
+            inputValues: {
+              homePrice: userData.homePrice,
+              monthlyRent: userData.monthlyRent,
+              downPaymentPercent: userData.downPaymentPercent
+            }
           } : undefined
         };
         
@@ -315,10 +326,15 @@ const handleChipClick = (message: string) => {
         role: 'assistant',
         content: `Here's the ${chartNames[chartRequest]}!`,
         chartToShow: chartRequest as 'netWorth' | 'monthlyCost' | 'totalCost' | 'equity' | 'rentGrowth',
-        snapshotData: chartData && monthlyCosts && totalCostData ? {
+        snapshotData: chartData && monthlyCosts && totalCostData && userData.homePrice && userData.monthlyRent && userData.downPaymentPercent ? {
           chartData: chartData,
           monthlyCosts: monthlyCosts,
-          totalCostData: totalCostData
+          totalCostData: totalCostData,
+          inputValues: {
+            homePrice: userData.homePrice,
+            monthlyRent: userData.monthlyRent,
+            downPaymentPercent: userData.downPaymentPercent
+          }
         } : undefined
       };
       setMessages(prev => [...prev, botMessage]);
@@ -450,19 +466,44 @@ const handleChipClick = (message: string) => {
     const data = snapshotData?.chartData || chartData;
     const costs = snapshotData?.monthlyCosts || monthlyCosts;
     const totalData = snapshotData?.totalCostData || totalCostData;
+    const inputVals = snapshotData?.inputValues || (userData.homePrice && userData.monthlyRent && userData.downPaymentPercent ? {
+      homePrice: userData.homePrice,
+      monthlyRent: userData.monthlyRent,
+      downPaymentPercent: userData.downPaymentPercent
+    } : null);
     
     if (!data) return null;
+    
+    // Values display box
+    const ValuesBox = inputVals ? (
+      <div style={{
+        background: '#f7fafc',
+        border: '2px solid #e2e8f0',
+        borderRadius: '8px',
+        padding: '12px',
+        marginBottom: '12px',
+        fontSize: '13px',
+        color: '#4a5568'
+      }}>
+        <div style={{ fontWeight: '600', marginBottom: '6px' }}>📊 Values for this chart:</div>
+        <div>🏠 Home Price: <strong>${inputVals.homePrice.toLocaleString()}</strong></div>
+        <div>💵 Monthly Rent: <strong>${inputVals.monthlyRent.toLocaleString()}</strong></div>
+        <div>💰 Down Payment: <strong>{inputVals.downPaymentPercent}%</strong></div>
+      </div>
+    ) : null;
     
     switch (chartType) {
       case 'netWorth':
         return (
           <div className="chart-wrapper">
+            {ValuesBox}
             <NetWorthChart data={data} />
           </div>
         );
       case 'monthlyCost':
         return costs ? (
           <div className="chart-wrapper">
+            {ValuesBox}
             <MonthlyCostChart 
               buyingCosts={costs.buying}
               rentingCosts={costs.renting}
@@ -472,6 +513,7 @@ const handleChipClick = (message: string) => {
       case 'totalCost':
         return totalData ? (
           <div className="chart-wrapper">
+            {ValuesBox}
             <TotalCostChart 
               buyerFinalNetWorth={totalData.buyerFinalNetWorth}
               renterFinalNetWorth={totalData.renterFinalNetWorth}
@@ -485,12 +527,14 @@ const handleChipClick = (message: string) => {
       case 'equity':
         return (
           <div className="chart-wrapper">
+            {ValuesBox}
             <EquityBuildupChart data={data} />
           </div>
         );
       case 'rentGrowth':
         return costs ? (
           <div className="chart-wrapper">
+            {ValuesBox}
             <RentGrowthChart 
               data={data} 
               monthlyMortgage={costs.buying.mortgage}
