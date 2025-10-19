@@ -105,7 +105,29 @@ const [chartsReady, setChartsReady] = useState(false);
     
     messages.forEach(message => {
       const role = message.role === 'user' ? 'You' : 'AI';
-      chatText += `${role}: ${message.content}\n\n`;
+      chatText += `${role}: ${message.content}\n`;
+      
+      // Add chart information if this message has a chart
+      if (message.chartToShow && message.snapshotData) {
+        const chartNames = {
+          netWorth: 'Net Worth Comparison',
+          monthlyCost: 'Monthly Costs Breakdown', 
+          totalCost: 'Total Cost Comparison',
+          equity: 'Equity Buildup',
+          rentGrowth: 'Rent Growth Comparison'
+        };
+        
+        const chartName = chartNames[message.chartToShow] || message.chartToShow;
+        const inputVals = message.snapshotData.inputValues;
+        
+        chatText += `\n📊 Chart Shown: ${chartName}\n`;
+        if (inputVals) {
+          chatText += `   Values: $${inputVals.homePrice.toLocaleString()}, $${inputVals.monthlyRent.toLocaleString()}, ${inputVals.downPaymentPercent}%\n`;
+        }
+        chatText += `\n`;
+      } else {
+        chatText += `\n`;
+      }
     });
     
     const blob = new Blob([chatText], { type: 'text/plain' });
