@@ -227,10 +227,18 @@ function isChartRequest(message: string): boolean {
     // Add bot response
     setMessages(prev => [...prev, assistantMessage]);
     
-    // If we have all data and charts not ready, calculate and show charts
-    if (!chartsReady && newUserData.homePrice && newUserData.monthlyRent && newUserData.downPaymentPercent) {
-      console.log('📊 All data collected! Generating charts...', newUserData);
-      calculateAndShowChart(newUserData);
+    // If we have all data, calculate charts (regenerate if data changed)
+    if (newUserData.homePrice && newUserData.monthlyRent && newUserData.downPaymentPercent) {
+      // Check if data changed
+      const dataChanged = 
+        newUserData.homePrice !== userData.homePrice ||
+        newUserData.monthlyRent !== userData.monthlyRent ||
+        newUserData.downPaymentPercent !== userData.downPaymentPercent;
+      
+      if (!chartsReady || dataChanged) {
+        console.log('📊 Generating charts...', newUserData, chartsReady ? '(data changed)' : '(initial)');
+        calculateAndShowChart(newUserData);
+      }
     }
   };
   
@@ -293,9 +301,12 @@ const handleChipClick = (message: string) => {
     }
   } else {
     // General question - provide conversational response
+    const downPaymentAmount = ((userData.homePrice || 0) * (userData.downPaymentPercent || 20) / 100);
     const responses: { [key: string]: string } = {
       '10 years': 'If you only stay 10 years, the math changes significantly. Early years favor renting since you are paying mostly interest, and closing costs reduce gains. Check the charts to see the break-even point!',
-      'down payment': `You would need $${((userData.homePrice || 0) * (userData.downPaymentPercent || 20) / 100).toLocaleString()} for your ${userData.downPaymentPercent || 20}% down payment. That is a significant upfront cost compared to renting.`,
+      'down payment': userData.homePrice && userData.downPaymentPercent 
+        ? `You would need $${downPaymentAmount.toLocaleString()} for your ${userData.downPaymentPercent}% down payment. That is a significant upfront cost compared to renting.`
+        : 'I need your home price and down payment percentage first to calculate that!',
       'prices drop': 'If home prices drop, you could end up underwater (owing more than the home is worth). However, if you plan to stay long-term and can afford payments, temporary drops may not matter. Real estate historically appreciates over 20-30 years.',
       'tax benefits': 'Homeowners can deduct mortgage interest and property taxes (up to limits). This reduces your taxable income. However, with the higher standard deduction now, many people do not itemize anymore, reducing this benefit.',
       'should i buy': `Based on your numbers, ${userData.homePrice && userData.monthlyRent ? 'buying could save you significant money over 30 years' : 'I need your numbers first'}. But consider: Can you afford the down payment? Planning to stay 5+ years? Comfortable with maintenance responsibilities?`,
