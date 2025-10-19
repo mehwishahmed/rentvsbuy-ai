@@ -247,12 +247,12 @@ const [chartsReady, setChartsReady] = useState(false);
 function shouldShowChart(aiResponse: string): string | null {
   const lower = aiResponse.toLowerCase();
   
-  // Check if AI is indicating a specific chart should be shown
-  if (lower.includes('net worth comparison')) return 'netWorth';
-  if (lower.includes('monthly costs breakdown')) return 'monthlyCost';
-  if (lower.includes('total cost comparison')) return 'totalCost';
-  if (lower.includes('equity buildup')) return 'equity';
-  if (lower.includes('rent growth')) return 'rentGrowth';
+  // Only trigger on exact phrases that clearly indicate showing a chart
+  if (lower.includes("here's your net worth comparison")) return 'netWorth';
+  if (lower.includes("here's your monthly costs breakdown")) return 'monthlyCost';
+  if (lower.includes("here's your total cost comparison")) return 'totalCost';
+  if (lower.includes("here's your equity buildup")) return 'equity';
+  if (lower.includes("here's your rent growth")) return 'rentGrowth';
   
   return null;
 }

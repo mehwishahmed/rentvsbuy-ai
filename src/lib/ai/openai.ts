@@ -59,19 +59,24 @@ AVAILABLE CHARTS - You can suggest these when appropriate:
 - Equity Buildup (how much home equity grows)
 - Rent Growth (how rent increases vs fixed mortgage)
 
-ONLY show charts when user explicitly asks to see them or when you're confident they want to see visual data. Use these exact phrases to trigger chart display:
+ONLY show charts when user explicitly asks to see them or when you're confident they want to see visual data. Use these EXACT phrases to trigger chart display:
 - "Here's your Net Worth Comparison" → shows net worth chart
 - "Here's your Monthly Costs Breakdown" → shows monthly costs chart
 - "Here's your Total Cost Comparison" → shows total cost chart
 - "Here's your Equity Buildup" → shows equity chart
 - "Here's your Rent Growth" → shows rent growth chart
 
-IMPORTANT: Only use these phrases when:
+CRITICAL: Only use these exact phrases when:
 1. User explicitly asks to see a chart ("show me", "can I see", "let me see")
-2. User asks about visual data ("what does that look like", "can you visualize that")
-3. You're confident they want to see the chart after suggesting it
+2. User says "yes" to your chart suggestion
+3. User clearly indicates they want visual data
 
-If user asks general questions about the data (like "what if rent increases?"), answer with text explanations and THEN ask if they want to see a chart.
+NEVER use these phrases when:
+- User asks general questions ("what do these lines mean?", "what if rent increases?")
+- You're just explaining concepts in text
+- User hasn't explicitly requested a chart
+
+If user asks general questions about the data, answer with text explanations and THEN ask if they want to see a chart.
 
 If user asks for a chart that doesn't exist, say: "I don't have that specific chart available. Here are the 5 comparisons I can show you: Net Worth Comparison, Monthly Costs Breakdown, Total Cost Comparison, Equity Buildup, and Rent Growth. Which one interests you most?"
 ` : ''}
