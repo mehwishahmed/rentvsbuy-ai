@@ -163,9 +163,12 @@ function isChartRequest(message: string): boolean {
     const chartRequest = detectChartRequest(content);
     const isAskingForChart = isChartRequest(content);
     
+    // Check if we have enough data to show charts (either already ready, or will be after this message)
+    const canShowCharts = chartsReady || (newUserData.homePrice && newUserData.monthlyRent && newUserData.downPaymentPercent);
+    
     // Handle chart requests
     if (isAskingForChart) {
-      if (!chartsReady) {
+      if (!canShowCharts) {
         // Charts not ready - ask for data first
         const assistantMessage: Message = {
           id: (Date.now() + 1).toString(),
@@ -175,6 +178,10 @@ function isChartRequest(message: string): boolean {
         setMessages(prev => [...prev, assistantMessage]);
         return;
       } else if (chartRequest) {
+        // Calculate charts if not already done
+        if (!chartsReady && newUserData.homePrice && newUserData.monthlyRent && newUserData.downPaymentPercent) {
+          calculateAndShowChart(newUserData);
+        }
         // Chart exists and is available - show it!
         const chartNames: { [key: string]: string } = {
           netWorth: 'net worth comparison',
@@ -226,8 +233,8 @@ function isChartRequest(message: string): boolean {
     // Add bot response
     setMessages(prev => [...prev, assistantMessage]);
     
-    // If we have all data, calculate and show charts
-    if (newUserData.homePrice && newUserData.monthlyRent && newUserData.downPaymentPercent) {
+    // If we have all data and charts not ready, calculate and show charts
+    if (!chartsReady && newUserData.homePrice && newUserData.monthlyRent && newUserData.downPaymentPercent) {
       calculateAndShowChart(newUserData);
     }
   };
@@ -248,8 +255,15 @@ const handleChipClick = (message: string) => {
   const chartRequest = detectChartRequest(message);
   const isAskingForChart = isChartRequest(message);
   
+  // Check if we have enough data to show charts
+  const canShowCharts = chartsReady || (userData.homePrice && userData.monthlyRent && userData.downPaymentPercent);
+  
   if (isAskingForChart) {
-    if (chartRequest && chartsReady) {
+    if (chartRequest && canShowCharts) {
+      // Calculate charts if not already done
+      if (!chartsReady && userData.homePrice && userData.monthlyRent && userData.downPaymentPercent) {
+        calculateAndShowChart(userData);
+      }
       // Show the requested chart
       setVisibleCharts(prev => ({
         ...prev,
@@ -272,7 +286,7 @@ const handleChipClick = (message: string) => {
         chartToShow: chartRequest as 'netWorth' | 'monthlyCost' | 'totalCost' | 'equity' | 'rentGrowth'
       };
       setMessages(prev => [...prev, botMessage]);
-    } else if (!chartsReady) {
+    } else if (!canShowCharts) {
       // Charts not ready yet
       const botMessage: Message = {
         id: (Date.now() + 1).toString(),
