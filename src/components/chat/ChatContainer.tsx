@@ -11,6 +11,7 @@ import { TotalCostChart } from '../charts/TotalCostChart';
 import { getAIResponse } from '../../lib/ai/openai';
 import { EquityBuildupChart } from '../charts/EquityBuildupChart';
 import { RentGrowthChart } from '../charts/RentGrowthChart';
+import { SuggestionChips } from './SuggestionChips';
 
 interface Message {
   id: string;
@@ -146,6 +147,80 @@ function detectChartRequest(message: string): string | null {
     }
   };
   
+  // Handle suggestion chip clicks
+
+// Handle suggestion chip clicks
+const handleChipClick = (message: string) => {
+  // Add user message
+  const userMessage: Message = {
+    id: Date.now().toString(),
+    role: 'user',
+    content: message
+  };
+  setMessages(prev => [...prev, userMessage]);
+  
+  // Check if this is a chart request
+  const chartRequest = detectChartRequest(message);
+  
+  if (chartRequest && chartsReady) {
+    // Show the requested chart
+    setVisibleCharts(prev => ({
+      ...prev,
+      [chartRequest]: true
+    }));
+    
+    // Add a brief bot response
+    const chartNames: { [key: string]: string } = {
+      netWorth: 'net worth comparison',
+      monthlyCost: 'monthly costs breakdown',
+      totalCost: 'total cost comparison',
+      equity: 'equity buildup',
+      rentGrowth: 'rent growth comparison'
+    };
+    
+    const botMessage: Message = {
+      id: (Date.now() + 1).toString(),
+      role: 'assistant',
+      content: `Here's the ${chartNames[chartRequest]}!`
+    };
+    setMessages(prev => [...prev, botMessage]);
+  } else {
+    // General question - provide conversational response
+    const responses: { [key: string]: string } = {
+      '10 years': 'If you only stay 10 years, the math changes significantly. Early years favor renting since you are paying mostly interest, and closing costs reduce gains. Check the charts to see the break-even point!',
+      'down payment': `You would need $${((userData.homePrice || 0) * (userData.downPaymentPercent || 20) / 100).toLocaleString()} for your ${userData.downPaymentPercent || 20}% down payment. That is a significant upfront cost compared to renting.`,
+      'prices drop': 'If home prices drop, you could end up underwater (owing more than the home is worth). However, if you plan to stay long-term and can afford payments, temporary drops may not matter. Real estate historically appreciates over 20-30 years.',
+      'tax benefits': 'Homeowners can deduct mortgage interest and property taxes (up to limits). This reduces your taxable income. However, with the higher standard deduction now, many people do not itemize anymore, reducing this benefit.',
+      'should i buy': `Based on your numbers, ${userData.homePrice && userData.monthlyRent ? 'buying could save you significant money over 30 years' : 'I need your numbers first'}. But consider: Can you afford the down payment? Planning to stay 5+ years? Comfortable with maintenance responsibilities?`,
+      'pay off': 'Buying typically pays off after 5-7 years once you build equity and avoid rent increases. However, this depends on your local market, interest rates, and how long you stay. The charts above show your specific timeline!',
+      'rent increases': 'If rent increases faster than the typical 3.5% we are assuming, buying becomes even more attractive! Your mortgage stays fixed while rent keeps climbing. Want me to show you the rent growth chart?'
+    };
+    
+    // Find matching response
+    const lowerMessage = message.toLowerCase();
+    let response = "That's a great question! ";
+    
+    for (const [key, value] of Object.entries(responses)) {
+      if (lowerMessage.includes(key)) {
+        response = value;
+        break;
+      }
+    }
+    
+    // Default if no match
+    if (response === "That's a great question! ") {
+      response += "I'm here to help you understand the rent vs buy decision. Feel free to ask about costs, charts, or any specific scenarios!";
+    }
+    
+    const botMessage: Message = {
+      id: (Date.now() + 1).toString(),
+      role: 'assistant',
+      content: response
+    };
+    setMessages(prev => [...prev, botMessage]);
+  }
+};
+
   const calculateAndShowChart = (data: UserData) => {
     const inputs: ScenarioInputs = {
       homePrice: data.homePrice!,
@@ -225,6 +300,14 @@ function detectChartRequest(message: string): string | null {
           />
         ))}
         
+        {/* ADD CHIPS HERE ⬇️ */}
+        {chartsReady && (
+          <SuggestionChips 
+            onChipClick={handleChipClick}
+            visibleCharts={visibleCharts}
+          />
+        )}
+
         {chartData && chartsReady && (
           <>
             {visibleCharts.netWorth && (
