@@ -53,6 +53,9 @@ export function ChatContainer() {
 
 // Track if charts are ready to show (data calculated)
 const [chartsReady, setChartsReady] = useState(false);
+  
+  // Restart modal state
+  const [showRestartModal, setShowRestartModal] = useState(false);
   const [monthlyCosts, setMonthlyCosts] = useState<{
     buying: any;
     renting: any;
@@ -67,6 +70,35 @@ const [chartsReady, setChartsReady] = useState(false);
     finalInvestmentValue: number;
   } | null>(null);
   
+  // Handle restart/reset
+  const handleRestart = () => {
+    // Reset all state to initial values
+    setMessages([
+      {
+        id: '1',
+        role: 'assistant',
+        content: "Hi! I'm your rent vs buy advisor. Tell me about your situation - what's the price of the house you're looking at?"
+      }
+    ]);
+    setUserData({
+      homePrice: null,
+      monthlyRent: null,
+      downPaymentPercent: null
+    });
+    setChartData(null);
+    setVisibleCharts({
+      netWorth: false,
+      monthlyCost: false,
+      totalCost: false,
+      equity: false,
+      rentGrowth: false
+    });
+    setChartsReady(false);
+    setMonthlyCosts(null);
+    setTotalCostData(null);
+    setShowRestartModal(false);
+  };
+
   // Detect which chart user is asking for
 function detectChartRequest(message: string): string | null {
   const lower = message.toLowerCase();
@@ -345,6 +377,13 @@ const handleChipClick = (message: string) => {
     <div className="chat-container">
       <div className="chat-header">
         <h1>RentVsBuy.ai</h1>
+        <button 
+          className="restart-button"
+          onClick={() => setShowRestartModal(true)}
+          title="Start over"
+        >
+          🔄 Restart
+        </button>
       </div>
       
       <div className="messages-container">
@@ -369,6 +408,30 @@ const handleChipClick = (message: string) => {
       </div>
       
       <ChatInput onSend={handleSendMessage} />
+      
+      {/* Restart Confirmation Modal */}
+      {showRestartModal && (
+        <div className="modal-overlay" onClick={() => setShowRestartModal(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <h2>Start Over?</h2>
+            <p>This will clear all your data and conversation. Are you sure?</p>
+            <div className="modal-buttons">
+              <button 
+                className="modal-button cancel-button"
+                onClick={() => setShowRestartModal(false)}
+              >
+                Cancel
+              </button>
+              <button 
+                className="modal-button confirm-button"
+                onClick={handleRestart}
+              >
+                Yes, Restart
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
   
