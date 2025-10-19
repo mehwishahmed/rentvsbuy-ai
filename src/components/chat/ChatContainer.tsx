@@ -103,23 +103,23 @@ const [chartsReady, setChartsReady] = useState(false);
 function detectChartRequest(message: string): string | null {
   const lower = message.toLowerCase();
   
-  // Net worth chart keywords
-  if (lower.includes('net worth') || lower.includes('wealth') || lower.includes('richer') || lower.includes('comparison')) {
+  // Net worth chart keywords (most specific first)
+  if (lower.includes('net worth') || lower.includes('wealth') || lower.includes('richer')) {
     return 'netWorth';
   }
   
   // Monthly cost chart keywords
-  if (lower.includes('monthly') || lower.includes('afford') || lower.includes('cost breakdown') || lower.includes('per month')) {
+  if (lower.includes('monthly cost') || lower.includes('monthly breakdown') || lower.includes('afford') || lower.includes('per month')) {
     return 'monthlyCost';
   }
   
   // Total cost chart keywords
-  if (lower.includes('total cost') || lower.includes('30 year') || lower.includes('overall') || lower.includes('winner')) {
+  if (lower.includes('total cost') || lower.includes('30 year') || lower.includes('overall cost') || lower.includes('winner') || lower.includes('which wins') || lower.includes('which option')) {
     return 'totalCost';
   }
   
   // Equity chart keywords
-  if (lower.includes('equity') || lower.includes('own') || lower.includes('ownership')) {
+  if (lower.includes('equity') || lower.includes('ownership')) {
     return 'equity';
   }
   
@@ -128,7 +128,20 @@ function detectChartRequest(message: string): string | null {
     return 'rentGrowth';
   }
   
+  // Generic chart requests - default to net worth comparison
+  if ((lower.includes('chart') || lower.includes('graph') || lower.includes('show me') || lower.includes('see a')) && 
+      (lower.includes('comparison') || lower.includes('compare'))) {
+    return 'netWorth';
+  }
+  
   return null;
+}
+
+// Check if user is asking for a chart (even if it doesn't exist)
+function isChartRequest(message: string): boolean {
+  const lower = message.toLowerCase();
+  return (lower.includes('chart') || lower.includes('graph') || lower.includes('show') || lower.includes('see')) &&
+         !lower.includes('suggestion');
 }
 
   const handleSendMessage = async (content: string) => {
@@ -146,10 +159,57 @@ function detectChartRequest(message: string): string | null {
     console.log('🔍 Extracted data:', newUserData);
     setUserData(newUserData);
     
-    // check if user is requesting a chart (we'll handle this after AI response)
-  const chartRequest = chartsReady ? detectChartRequest(content) : null;
+    // Check if user is requesting a chart
+    const chartRequest = detectChartRequest(content);
+    const isAskingForChart = isChartRequest(content);
+    
+    // Handle chart requests
+    if (isAskingForChart) {
+      if (!chartsReady) {
+        // Charts not ready - ask for data first
+        const assistantMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          role: 'assistant',
+          content: "I'd love to show you charts! But first, I need some information. Can you tell me: the house price, your monthly rent, and down payment percentage?"
+        };
+        setMessages(prev => [...prev, assistantMessage]);
+        return;
+      } else if (chartRequest) {
+        // Chart exists and is available - show it!
+        const chartNames: { [key: string]: string } = {
+          netWorth: 'net worth comparison',
+          monthlyCost: 'monthly costs breakdown',
+          totalCost: 'total cost comparison',
+          equity: 'equity buildup',
+          rentGrowth: 'rent growth comparison'
+        };
+        
+        const assistantMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          role: 'assistant',
+          content: `Here's the ${chartNames[chartRequest]}!`,
+          chartToShow: chartRequest as 'netWorth' | 'monthlyCost' | 'totalCost' | 'equity' | 'rentGrowth'
+        };
+        
+        setMessages(prev => [...prev, assistantMessage]);
+        setVisibleCharts(prev => ({
+          ...prev,
+          [chartRequest]: true
+        }));
+        return;
+      } else {
+        // User asked for a chart that doesn't exist
+        const assistantMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          role: 'assistant',
+          content: "I don't have that specific chart available. Here's what I can show you:\n\n📊 Net Worth Comparison\n💰 Monthly Costs Breakdown\n🏆 Total Cost Comparison\n🏠 Equity Buildup\n📈 Rent Growth\n\nWhich one would you like to see?"
+        };
+        setMessages(prev => [...prev, assistantMessage]);
+        return;
+      }
+    }
 
-    // Get AI response
+    // Normal conversation - get AI response
     const allMessages = [...messages, userMessage].map(m => ({
       role: m.role,
       content: m.content
@@ -160,20 +220,11 @@ function detectChartRequest(message: string): string | null {
     const assistantMessage: Message = {
       id: (Date.now() + 1).toString(),
       role: 'assistant',
-      content: botResponse,
-      chartToShow: chartRequest ? (chartRequest as 'netWorth' | 'monthlyCost' | 'totalCost' | 'equity' | 'rentGrowth') : undefined
+      content: botResponse
     };
     
     // Add bot response
     setMessages(prev => [...prev, assistantMessage]);
-    
-    // Mark chart as visible if requested
-    if (chartRequest) {
-      setVisibleCharts(prev => ({
-        ...prev,
-        [chartRequest]: true
-      }));
-    }
     
     // If we have all data, calculate and show charts
     if (newUserData.homePrice && newUserData.monthlyRent && newUserData.downPaymentPercent) {
@@ -195,30 +246,49 @@ const handleChipClick = (message: string) => {
   
   // Check if this is a chart request
   const chartRequest = detectChartRequest(message);
+  const isAskingForChart = isChartRequest(message);
   
-  if (chartRequest && chartsReady) {
-    // Show the requested chart
-    setVisibleCharts(prev => ({
-      ...prev,
-      [chartRequest]: true
-    }));
-    
-    // Add a brief bot response WITH chart attached
-    const chartNames: { [key: string]: string } = {
-      netWorth: 'net worth comparison',
-      monthlyCost: 'monthly costs breakdown',
-      totalCost: 'total cost comparison',
-      equity: 'equity buildup',
-      rentGrowth: 'rent growth comparison'
-    };
-    
-    const botMessage: Message = {
-      id: (Date.now() + 1).toString(),
-      role: 'assistant',
-      content: `Here's the ${chartNames[chartRequest]}!`,
-      chartToShow: chartRequest as 'netWorth' | 'monthlyCost' | 'totalCost' | 'equity' | 'rentGrowth'
-    };
-    setMessages(prev => [...prev, botMessage]);
+  if (isAskingForChart) {
+    if (chartRequest && chartsReady) {
+      // Show the requested chart
+      setVisibleCharts(prev => ({
+        ...prev,
+        [chartRequest]: true
+      }));
+      
+      // Add a brief bot response WITH chart attached
+      const chartNames: { [key: string]: string } = {
+        netWorth: 'net worth comparison',
+        monthlyCost: 'monthly costs breakdown',
+        totalCost: 'total cost comparison',
+        equity: 'equity buildup',
+        rentGrowth: 'rent growth comparison'
+      };
+      
+      const botMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        role: 'assistant',
+        content: `Here's the ${chartNames[chartRequest]}!`,
+        chartToShow: chartRequest as 'netWorth' | 'monthlyCost' | 'totalCost' | 'equity' | 'rentGrowth'
+      };
+      setMessages(prev => [...prev, botMessage]);
+    } else if (!chartsReady) {
+      // Charts not ready yet
+      const botMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        role: 'assistant',
+        content: "I need your information first to generate charts! Can you tell me: the house price, your monthly rent, and down payment percentage?"
+      };
+      setMessages(prev => [...prev, botMessage]);
+    } else {
+      // Chart doesn't exist
+      const botMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        role: 'assistant',
+        content: "I don't have that chart. Here's what's available:\n\n📊 Net Worth Comparison\n💰 Monthly Costs Breakdown\n🏆 Total Cost Comparison\n🏠 Equity Buildup\n📈 Rent Growth"
+      };
+      setMessages(prev => [...prev, botMessage]);
+    }
   } else {
     // General question - provide conversational response
     const responses: { [key: string]: string } = {
