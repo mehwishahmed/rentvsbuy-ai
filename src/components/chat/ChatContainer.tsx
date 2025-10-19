@@ -18,6 +18,22 @@ interface Message {
   role: 'user' | 'assistant';
   content: string;
   chartToShow?: 'netWorth' | 'monthlyCost' | 'totalCost' | 'equity' | 'rentGrowth';
+  // Store chart data with the message so it doesn't change when new scenarios are calculated
+  snapshotData?: {
+    chartData: MonthlySnapshot[];
+    monthlyCosts: {
+      buying: any;
+      renting: any;
+    };
+    totalCostData: {
+      buyerFinalNetWorth: number;
+      renterFinalNetWorth: number;
+      totalBuyingCosts: number;
+      totalRentingCosts: number;
+      finalHomeValue: number;
+      finalInvestmentValue: number;
+    };
+  };
 }
 
 interface UserData {
@@ -185,11 +201,17 @@ function isChartRequest(message: string): boolean {
           rentGrowth: 'rent growth comparison'
         };
         
+        // Attach current chart data snapshot to this message
         const assistantMessage: Message = {
           id: (Date.now() + 1).toString(),
           role: 'assistant',
           content: `Here's the ${chartNames[chartRequest]}!`,
-          chartToShow: chartRequest as 'netWorth' | 'monthlyCost' | 'totalCost' | 'equity' | 'rentGrowth'
+          chartToShow: chartRequest as 'netWorth' | 'monthlyCost' | 'totalCost' | 'equity' | 'rentGrowth',
+          snapshotData: chartData && monthlyCosts && totalCostData ? {
+            chartData: chartData,
+            monthlyCosts: monthlyCosts,
+            totalCostData: totalCostData
+          } : undefined
         };
         
         setMessages(prev => [...prev, assistantMessage]);
@@ -237,6 +259,19 @@ function isChartRequest(message: string): boolean {
       
       if (!chartsReady || dataChanged) {
         console.log('📊 Generating charts...', newUserData, chartsReady ? '(data changed)' : '(initial)');
+        
+        // If data changed, reset visible charts (all become available again)
+        if (dataChanged && chartsReady) {
+          console.log('🔄 Data changed! Resetting chart visibility...');
+          setVisibleCharts({
+            netWorth: false,
+            monthlyCost: false,
+            totalCost: false,
+            equity: false,
+            rentGrowth: false
+          });
+        }
+        
         calculateAndShowChart(newUserData);
       }
     }
@@ -279,7 +314,12 @@ const handleChipClick = (message: string) => {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
         content: `Here's the ${chartNames[chartRequest]}!`,
-        chartToShow: chartRequest as 'netWorth' | 'monthlyCost' | 'totalCost' | 'equity' | 'rentGrowth'
+        chartToShow: chartRequest as 'netWorth' | 'monthlyCost' | 'totalCost' | 'equity' | 'rentGrowth',
+        snapshotData: chartData && monthlyCosts && totalCostData ? {
+          chartData: chartData,
+          monthlyCosts: monthlyCosts,
+          totalCostData: totalCostData
+        } : undefined
       };
       setMessages(prev => [...prev, botMessage]);
     } else if (!chartsReady) {
@@ -404,51 +444,56 @@ const handleChipClick = (message: string) => {
     });
   };
   
-  // Helper function to render chart based on type
-  const renderChart = (chartType: string) => {
-    if (!chartData || !chartsReady) return null;
+  // Helper function to render chart based on type - uses message's snapshot data
+  const renderChart = (chartType: string, snapshotData?: Message['snapshotData']) => {
+    // Use snapshot data from the message, or fall back to current data
+    const data = snapshotData?.chartData || chartData;
+    const costs = snapshotData?.monthlyCosts || monthlyCosts;
+    const totalData = snapshotData?.totalCostData || totalCostData;
+    
+    if (!data) return null;
     
     switch (chartType) {
       case 'netWorth':
         return (
           <div className="chart-wrapper">
-            <NetWorthChart data={chartData} />
+            <NetWorthChart data={data} />
           </div>
         );
       case 'monthlyCost':
-        return monthlyCosts ? (
+        return costs ? (
           <div className="chart-wrapper">
             <MonthlyCostChart 
-              buyingCosts={monthlyCosts.buying}
-              rentingCosts={monthlyCosts.renting}
+              buyingCosts={costs.buying}
+              rentingCosts={costs.renting}
             />
           </div>
         ) : null;
       case 'totalCost':
-        return totalCostData ? (
+        return totalData ? (
           <div className="chart-wrapper">
             <TotalCostChart 
-              buyerFinalNetWorth={totalCostData.buyerFinalNetWorth}
-              renterFinalNetWorth={totalCostData.renterFinalNetWorth}
-              totalBuyingCosts={totalCostData.totalBuyingCosts}
-              totalRentingCosts={totalCostData.totalRentingCosts}
-              finalHomeValue={totalCostData.finalHomeValue}
-              finalInvestmentValue={totalCostData.finalInvestmentValue}
+              buyerFinalNetWorth={totalData.buyerFinalNetWorth}
+              renterFinalNetWorth={totalData.renterFinalNetWorth}
+              totalBuyingCosts={totalData.totalBuyingCosts}
+              totalRentingCosts={totalData.totalRentingCosts}
+              finalHomeValue={totalData.finalHomeValue}
+              finalInvestmentValue={totalData.finalInvestmentValue}
             />
           </div>
         ) : null;
       case 'equity':
         return (
           <div className="chart-wrapper">
-            <EquityBuildupChart data={chartData} />
+            <EquityBuildupChart data={data} />
           </div>
         );
       case 'rentGrowth':
-        return monthlyCosts ? (
+        return costs ? (
           <div className="chart-wrapper">
             <RentGrowthChart 
-              data={chartData} 
-              monthlyMortgage={monthlyCosts.buying.mortgage}
+              data={data} 
+              monthlyMortgage={costs.buying.mortgage}
             />
           </div>
         ) : null;
@@ -477,8 +522,8 @@ const handleChipClick = (message: string) => {
               role={message.role}
               content={message.content}
             />
-            {/* Render chart right after message if it has one */}
-            {message.chartToShow && renderChart(message.chartToShow)}
+            {/* Render chart right after message if it has one - uses message's snapshot data */}
+            {message.chartToShow && renderChart(message.chartToShow, message.snapshotData)}
           </div>
         ))}
         
