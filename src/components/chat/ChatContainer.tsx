@@ -92,6 +92,28 @@ const [chartsReady, setChartsReady] = useState(false);
     finalInvestmentValue: number;
   } | null>(null);
   
+  // Handle save chat
+  const handleSaveChat = () => {
+    const chatData = {
+      messages,
+      userData,
+      timestamp: new Date().toISOString(),
+      scenario: userData.homePrice && userData.monthlyRent && userData.downPaymentPercent ? 
+        `$${userData.homePrice.toLocaleString()}, $${userData.monthlyRent.toLocaleString()}, ${userData.downPaymentPercent}%` : 
+        'Incomplete scenario'
+    };
+    
+    const blob = new Blob([JSON.stringify(chatData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `rentvsbuy-chat-${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
   // Handle restart/reset
   const handleRestart = () => {
     // Reset all state to initial values
@@ -654,13 +676,22 @@ const handleChipClick = (message: string) => {
     <div className="chat-container">
       <div className="chat-header">
         <h1>RentVsBuy.ai</h1>
-        <button 
-          className="restart-button"
-          onClick={() => setShowRestartModal(true)}
-          title="Start over"
-        >
-          🔄 Restart
-        </button>
+        <div className="header-buttons">
+          <button 
+            className="save-button"
+            onClick={handleSaveChat}
+            title="Save current chat"
+          >
+            💾 Save Chat
+          </button>
+          <button 
+            className="restart-button"
+            onClick={() => setShowRestartModal(true)}
+            title="Start over"
+          >
+            🔄 Restart
+          </button>
+        </div>
       </div>
       
       <div className="messages-container">
