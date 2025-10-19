@@ -76,7 +76,7 @@ export function ChatContainer() {
     }));
     
     const botResponse = await getAIResponse(allMessages, newUserData);
-    
+
     const assistantMessage: Message = {
       id: (Date.now() + 1).toString(),
       role: 'assistant',
@@ -226,78 +226,75 @@ export function ChatContainer() {
 
 // Extract numbers from user messages
 
-// Extract numbers from user messages with better context awareness
-// Extract numbers from user messages - handles multiple values at once!
+// Extract numbers from user messages - handles comma-separated values!
 function extractUserData(message: string, currentData: UserData): UserData {
   const newData = { ...currentData };
   const lowerMessage = message.toLowerCase();
   
-  // Helper: Extract all numbers from message
-  const extractAllNumbers = (str: string): number[] => {
-    const numbers: number[] = [];
-    const regex = /\$?\s*([\d,]+)k?\b/gi;
-    let match;
-    
-    while ((match = regex.exec(str)) !== null) {
-      let num = parseFloat(match[1].replace(/,/g, ''));
-      // Check if 'k' appears within 2 characters after the number
-      const afterMatch = str.slice(match.index, match.index + match[0].length + 2);
-      if (afterMatch.toLowerCase().includes('k')) {
+  // Helper: Extract number from a single string (not comma-separated)
+  const extractSingleNumber = (str: string): number | null => {
+    // Match formats: 500000, $500k, $500,000 (with thousand separators)
+    const numMatch = str.match(/\$?\s*([\d,]+)k?\b/i);
+    if (numMatch) {
+      let num = parseFloat(numMatch[1].replace(/,/g, ''));
+      if (str.toLowerCase().includes('k')) {
         num *= 1000;
       }
-      numbers.push(num);
+      return num;
     }
-    return numbers;
+    return null;
   };
   
-  const allNumbers = extractAllNumbers(message);
+  // Split by commas and extract all numbers
+  const parts = message.split(/,|\s+and\s+/); // Split by comma or "and"
+  const allNumbers: number[] = [];
   
-  // RULE 1: Extract home price (look for keywords or big numbers)
-  if (!newData.homePrice) {
-    if (lowerMessage.includes('house') || lowerMessage.includes('home') || lowerMessage.includes('price')) {
-      const price = allNumbers.find(n => n > 50000);
-      if (price) {
-        newData.homePrice = price;
-      }
-    } else {
-      // Fallback: biggest number over 50k
-      const bigNumber = allNumbers.find(n => n > 50000);
-      if (bigNumber) {
-        newData.homePrice = bigNumber;
-      }
+  parts.forEach(part => {
+    const num = extractSingleNumber(part.trim());
+    if (num !== null) {
+      allNumbers.push(num);
+    }
+  });
+  
+  console.log('🔍 Found numbers:', allNumbers);
+  
+  // If only one number, use context clues
+  if (allNumbers.length === 1) {
+    const num = allNumbers[0];
+    
+    // Home price (big number or has keywords)
+    if (!newData.homePrice && (num > 50000 || lowerMessage.includes('house') || lowerMessage.includes('home') || lowerMessage.includes('price'))) {
+      newData.homePrice = num;
+    }
+    // Rent (medium number or has keywords)
+    else if (!newData.monthlyRent && (num >= 500 && num <= 50000 || lowerMessage.includes('rent'))) {
+      newData.monthlyRent = num;
+    }
+    // Down payment (small number or has keywords)
+    else if (!newData.downPaymentPercent && (num >= 1 && num <= 100 || lowerMessage.includes('%') || lowerMessage.includes('down'))) {
+      newData.downPaymentPercent = num;
     }
   }
   
-  // RULE 2: Extract rent (look for keywords or medium numbers)
-  if (!newData.monthlyRent) {
-    if (lowerMessage.includes('rent') || lowerMessage.includes('paying')) {
-      const rent = allNumbers.find(n => n >= 500 && n <= 50000 && n !== newData.homePrice);
-      if (rent) {
-        newData.monthlyRent = rent;
-      }
-    } else {
-      // Fallback: medium number in rent range
-      const rentRange = allNumbers.find(n => n >= 500 && n <= 50000 && n !== newData.homePrice);
-      if (rentRange) {
-        newData.monthlyRent = rentRange;
-      }
+  // If multiple numbers, assign by size
+  else if (allNumbers.length >= 2) {
+    allNumbers.sort((a, b) => b - a); // Sort largest to smallest
+    
+    // Biggest number = home price
+    if (!newData.homePrice && allNumbers[0] > 50000) {
+      newData.homePrice = allNumbers[0];
     }
-  }
-  
-  // RULE 3: Extract down payment % (look for % or small numbers)
-  if (!newData.downPaymentPercent) {
-    const percentMatch = message.match(/(\d+)\s*%|(\d+)\s*percent/i);
-    if (percentMatch) {
-      const down = parseFloat(percentMatch[1] || percentMatch[2]);
-      if (down >= 1 && down <= 100) {
-        newData.downPaymentPercent = down;
-      }
-    } else {
-      // Fallback: small number (1-100 range)
-      const smallNum = allNumbers.find(n => n >= 1 && n <= 100 && n !== newData.homePrice && n !== newData.monthlyRent);
-      if (smallNum) {
-        newData.downPaymentPercent = smallNum;
-      }
+    
+    // Medium number = rent
+    const rentNumber = allNumbers.find(n => n >= 500 && n <= 50000);
+    if (!newData.monthlyRent && rentNumber) {
+      newData.monthlyRent = rentNumber;
+    }
+    
+    // Small number = down payment %
+    const downNumber = allNumbers.find(n => n >= 1 && n <= 100 && n !== rentNumber);
+    if (!newData.downPaymentPercent && downNumber) {
+      newData.downPaymentPercent = downNumber;
     }
   }
   
