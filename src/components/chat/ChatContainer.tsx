@@ -94,20 +94,25 @@ const [chartsReady, setChartsReady] = useState(false);
   
   // Handle save chat
   const handleSaveChat = () => {
-    const chatData = {
-      messages,
-      userData,
-      timestamp: new Date().toISOString(),
-      scenario: userData.homePrice && userData.monthlyRent && userData.downPaymentPercent ? 
-        `$${userData.homePrice.toLocaleString()}, $${userData.monthlyRent.toLocaleString()}, ${userData.downPaymentPercent}%` : 
-        'Incomplete scenario'
-    };
+    const scenario = userData.homePrice && userData.monthlyRent && userData.downPaymentPercent ? 
+      `$${userData.homePrice.toLocaleString()}, $${userData.monthlyRent.toLocaleString()}, ${userData.downPaymentPercent}%` : 
+      'Incomplete scenario';
     
-    const blob = new Blob([JSON.stringify(chatData, null, 2)], { type: 'application/json' });
+    let chatText = `RentVsBuy.ai Chat Session\n`;
+    chatText += `Date: ${new Date().toLocaleDateString()}\n`;
+    chatText += `Scenario: ${scenario}\n\n`;
+    chatText += `=== Conversation ===\n\n`;
+    
+    messages.forEach(message => {
+      const role = message.role === 'user' ? 'You' : 'AI';
+      chatText += `${role}: ${message.content}\n\n`;
+    });
+    
+    const blob = new Blob([chatText], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `rentvsbuy-chat-${new Date().toISOString().split('T')[0]}.json`;
+    a.download = `rentvsbuy-chat-${new Date().toISOString().split('T')[0]}.txt`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
