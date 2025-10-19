@@ -85,15 +85,15 @@ export function TotalCostChart({
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', textAlign: 'center' }}>
           <div>
             <h4 style={{ color: '#667eea', marginBottom: '8px' }}>💰 Buying Breakdown</h4>
-            <p><strong>Total Spent:</strong> ${totalBuyingCosts.toLocaleString()}</p>
-            <p><strong>Home Value:</strong> ${finalHomeValue.toLocaleString()}</p>
-            <p><strong>Net Cost:</strong> ${Math.round(buyingNetCost).toLocaleString()}</p>
+            <p style={{ color: 'black' }}><strong>Total Spent:</strong> ${totalBuyingCosts.toLocaleString()}</p>
+            <p style={{ color: 'black' }}><strong>Home Value:</strong> ${finalHomeValue.toLocaleString()}</p>
+            <p style={{ color: 'black' }}><strong>Net Cost:</strong> ${Math.round(buyingNetCost).toLocaleString()}</p>
           </div>
           <div>
             <h4 style={{ color: '#f56565', marginBottom: '8px' }}>🏠 Renting Breakdown</h4>
-            <p><strong>Total Spent:</strong> ${totalRentingCosts.toLocaleString()}</p>
-            <p><strong>Investment Value:</strong> ${finalInvestmentValue.toLocaleString()}</p>
-            <p><strong>Net Cost:</strong> ${Math.round(rentingNetCost).toLocaleString()}</p>
+            <p style={{ color: 'black' }}><strong>Total Spent:</strong> ${totalRentingCosts.toLocaleString()}</p>
+            <p style={{ color: 'black' }}><strong>Investment Value:</strong> ${finalInvestmentValue.toLocaleString()}</p>
+            <p style={{ color: 'black' }}><strong>Net Cost:</strong> ${Math.round(rentingNetCost).toLocaleString()}</p>
           </div>
         </div>
       </div>

@@ -80,7 +80,7 @@ export function EquityBuildupChart({ data }: EquityBuildupChartProps) {
       </ResponsiveContainer>
       
       <div style={{ marginTop: '20px', padding: '20px', background: '#f7fafc', borderRadius: '12px' }}>
-        <h4 style={{ marginBottom: '12px', color: '#2d3748' }}>What This Shows:</h4>
+        <h4 style={{ marginBottom: '12px', color: '#black' }}>What This Shows:</h4>
         <p style={{ marginBottom: '8px', lineHeight: '1.6' }}>
           This chart shows how much of your home you actually <strong>own</strong> over time (your equity).
         </p>
