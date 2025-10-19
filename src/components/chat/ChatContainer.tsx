@@ -13,6 +13,7 @@ import { EquityBuildupChart } from '../charts/EquityBuildupChart';
 import { RentGrowthChart } from '../charts/RentGrowthChart';
 import { SuggestionChips } from './SuggestionChips';
 import html2canvas from 'html2canvas';
+import jsPDF from 'jspdf';
 
 interface Message {
   id: string;
@@ -93,83 +94,119 @@ const [chartsReady, setChartsReady] = useState(false);
     finalInvestmentValue: number;
   } | null>(null);
   
-  // Handle save chat
+  // Handle save chat as PDF
   const handleSaveChat = async () => {
-    const scenario = userData.homePrice && userData.monthlyRent && userData.downPaymentPercent ? 
-      `$${userData.homePrice.toLocaleString()}, $${userData.monthlyRent.toLocaleString()}, ${userData.downPaymentPercent}%` : 
-      'Incomplete scenario';
-    
-    let chatText = `RentVsBuy.ai Chat Session\n`;
-    chatText += `Date: ${new Date().toLocaleDateString()}\n`;
-    chatText += `Scenario: ${scenario}\n\n`;
-    chatText += `=== Conversation ===\n\n`;
-    
-    // Collect chart images
-    const chartImages: string[] = [];
-    
-    for (const message of messages) {
-      const role = message.role === 'user' ? 'You' : 'AI';
-      chatText += `${role}: ${message.content}\n`;
+    try {
+      // Create new PDF document
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const margin = 20;
+      let yPosition = margin;
       
-      // Add chart information if this message has a chart
-      if (message.chartToShow && message.snapshotData) {
-        const chartNames = {
-          netWorth: 'Net Worth Comparison',
-          monthlyCost: 'Monthly Costs Breakdown', 
-          totalCost: 'Total Cost Comparison',
-          equity: 'Equity Buildup',
-          rentGrowth: 'Rent Growth Comparison'
-        };
-        
-        const chartName = chartNames[message.chartToShow] || message.chartToShow;
-        const inputVals = message.snapshotData.inputValues;
-        
-        chatText += `\n📊 Chart Shown: ${chartName}\n`;
-        if (inputVals) {
-          chatText += `   Values: $${inputVals.homePrice.toLocaleString()}, $${inputVals.monthlyRent.toLocaleString()}, ${inputVals.downPaymentPercent}%\n`;
+      // Helper function to check if we need a new page
+      const checkNewPage = (requiredHeight: number) => {
+        if (yPosition + requiredHeight > pageHeight - margin) {
+          pdf.addPage();
+          yPosition = margin;
+          return true;
+        }
+        return false;
+      };
+      
+      // Helper function to add text with word wrapping
+      const addText = (text: string, fontSize: number = 12, isBold: boolean = false) => {
+        pdf.setFontSize(fontSize);
+        if (isBold) {
+          pdf.setFont('helvetica', 'bold');
+        } else {
+          pdf.setFont('helvetica', 'normal');
         }
         
-        // Try to capture the chart as image
-        const chartElement = document.querySelector(`[data-message-id="${message.id}"] .chart-wrapper`);
-        if (chartElement) {
-          try {
-            const canvas = await html2canvas(chartElement as HTMLElement);
-            const chartImageData = canvas.toDataURL('image/png');
-            chartImages.push(chartImageData);
-            chatText += `   [Chart image captured]\n`;
-          } catch (error) {
-            console.log('Could not capture chart image:', error);
-            chatText += `   [Chart image not available]\n`;
+        const lines = pdf.splitTextToSize(text, pageWidth - 2 * margin);
+        checkNewPage(lines.length * fontSize * 0.4 + 5);
+        
+        pdf.text(lines, margin, yPosition);
+        yPosition += lines.length * fontSize * 0.4 + 5;
+      };
+      
+      // Add header
+      addText('RentVsBuy.ai Analysis', 20, true);
+      addText(`Generated on ${new Date().toLocaleDateString()}`, 12);
+      
+      // Add scenario info
+      const scenario = userData.homePrice && userData.monthlyRent && userData.downPaymentPercent ? 
+        `$${userData.homePrice.toLocaleString()}, $${userData.monthlyRent.toLocaleString()}, ${userData.downPaymentPercent}%` : 
+        'Incomplete scenario';
+      addText(`Scenario: ${scenario}`, 14, true);
+      
+      yPosition += 10; // Extra space before conversation
+      
+      // Process each message
+      for (const message of messages) {
+        const role = message.role === 'user' ? 'You' : 'AI Assistant';
+        
+        // Add message header
+        addText(`${role}:`, 12, true);
+        
+        // Add message content
+        addText(message.content, 11);
+        
+        // Add chart if present
+        if (message.chartToShow && message.snapshotData) {
+          const chartNames = {
+            netWorth: 'Net Worth Comparison',
+            monthlyCost: 'Monthly Costs Breakdown', 
+            totalCost: 'Total Cost Comparison',
+            equity: 'Equity Buildup',
+            rentGrowth: 'Rent Growth Comparison'
+          };
+          
+          const chartName = chartNames[message.chartToShow] || message.chartToShow;
+          const inputVals = message.snapshotData.inputValues;
+          
+          addText(`📊 ${chartName}`, 12, true);
+          
+          if (inputVals) {
+            addText(`Values: $${inputVals.homePrice.toLocaleString()}, $${inputVals.monthlyRent.toLocaleString()}, ${inputVals.downPaymentPercent}%`, 10);
+          }
+          
+          // Try to capture and add chart image
+          const chartElement = document.querySelector(`[data-message-id="${message.id}"] .chart-wrapper`);
+          if (chartElement) {
+            try {
+              const canvas = await html2canvas(chartElement as HTMLElement, {
+                backgroundColor: '#ffffff',
+                scale: 2 // Higher quality
+              });
+              
+              const imgData = canvas.toDataURL('image/png');
+              const imgWidth = pageWidth - 2 * margin;
+              const imgHeight = (canvas.height * imgWidth) / canvas.width;
+              
+              // Check if we need a new page for the chart
+              checkNewPage(imgHeight + 10);
+              
+              pdf.addImage(imgData, 'PNG', margin, yPosition, imgWidth, imgHeight);
+              yPosition += imgHeight + 10;
+              
+            } catch (error) {
+              console.log('Could not capture chart image:', error);
+              addText('[Chart image could not be captured]', 10);
+            }
           }
         }
         
-        chatText += `\n`;
-      } else {
-        chatText += `\n`;
+        yPosition += 5; // Space between messages
       }
-    }
-    
-    // Save text file
-    const textBlob = new Blob([chatText], { type: 'text/plain' });
-    const textUrl = URL.createObjectURL(textBlob);
-    const textA = document.createElement('a');
-    textA.href = textUrl;
-    textA.download = `rentvsbuy-chat-${new Date().toISOString().split('T')[0]}.txt`;
-    document.body.appendChild(textA);
-    textA.click();
-    document.body.removeChild(textA);
-    URL.revokeObjectURL(textUrl);
-    
-    // Save chart images if any were captured
-    if (chartImages.length > 0) {
-      chartImages.forEach((imageData, index) => {
-        const link = document.createElement('a');
-        link.download = `rentvsbuy-chart-${index + 1}-${new Date().toISOString().split('T')[0]}.png`;
-        link.href = imageData;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-      });
+      
+      // Save the PDF
+      const fileName = `rentvsbuy-analysis-${new Date().toISOString().split('T')[0]}.pdf`;
+      pdf.save(fileName);
+      
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      alert('Failed to generate PDF. Please try again.');
     }
   };
 
