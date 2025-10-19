@@ -207,30 +207,64 @@ function isChartRequest(message: string): boolean {
           rentGrowth: 'rent growth comparison'
         };
         
-        // Attach current chart data snapshot to this message
-        // Use newUserData (not userData) to get the most recent values
-        const assistantMessage: Message = {
-          id: (Date.now() + 1).toString(),
-          role: 'assistant',
-          content: `Here's the ${chartNames[chartRequest]}!`,
-          chartToShow: chartRequest as 'netWorth' | 'monthlyCost' | 'totalCost' | 'equity' | 'rentGrowth',
-          snapshotData: chartData && monthlyCosts && totalCostData && newUserData.homePrice && newUserData.monthlyRent && newUserData.downPaymentPercent ? {
-            chartData: chartData,
-            monthlyCosts: monthlyCosts,
-            totalCostData: totalCostData,
-            inputValues: {
-              homePrice: newUserData.homePrice,
-              monthlyRent: newUserData.monthlyRent,
-              downPaymentPercent: newUserData.downPaymentPercent
-            }
-          } : undefined
-        };
-        
-        setMessages(prev => [...prev, assistantMessage]);
-        setVisibleCharts(prev => ({
-          ...prev,
-          [chartRequest]: true
-        }));
+        // If data just changed, wait for calculation to complete
+        const dataChanged = 
+          newUserData.homePrice !== userData.homePrice ||
+          newUserData.monthlyRent !== userData.monthlyRent ||
+          newUserData.downPaymentPercent !== userData.downPaymentPercent;
+          
+        if (dataChanged) {
+          console.log('⏳ Data changed, waiting for calculation to complete...');
+          // Wait for calculation to finish, then create the message
+          setTimeout(() => {
+            const assistantMessage: Message = {
+              id: (Date.now() + 1).toString(),
+              role: 'assistant',
+              content: `Here's the ${chartNames[chartRequest]}!`,
+              chartToShow: chartRequest as 'netWorth' | 'monthlyCost' | 'totalCost' | 'equity' | 'rentGrowth',
+              snapshotData: chartData && monthlyCosts && totalCostData && newUserData.homePrice && newUserData.monthlyRent && newUserData.downPaymentPercent ? {
+                chartData: chartData,
+                monthlyCosts: monthlyCosts,
+                totalCostData: totalCostData,
+                inputValues: {
+                  homePrice: newUserData.homePrice,
+                  monthlyRent: newUserData.monthlyRent,
+                  downPaymentPercent: newUserData.downPaymentPercent
+                }
+              } : undefined
+            };
+            
+            setMessages(prev => [...prev, assistantMessage]);
+            setVisibleCharts(prev => ({
+              ...prev,
+              [chartRequest]: true
+            }));
+          }, 200);
+        } else {
+          // No data change, create message immediately
+          const assistantMessage: Message = {
+            id: (Date.now() + 1).toString(),
+            role: 'assistant',
+            content: `Here's the ${chartNames[chartRequest]}!`,
+            chartToShow: chartRequest as 'netWorth' | 'monthlyCost' | 'totalCost' | 'equity' | 'rentGrowth',
+            snapshotData: chartData && monthlyCosts && totalCostData && newUserData.homePrice && newUserData.monthlyRent && newUserData.downPaymentPercent ? {
+              chartData: chartData,
+              monthlyCosts: monthlyCosts,
+              totalCostData: totalCostData,
+              inputValues: {
+                homePrice: newUserData.homePrice,
+                monthlyRent: newUserData.monthlyRent,
+                downPaymentPercent: newUserData.downPaymentPercent
+              }
+            } : undefined
+          };
+          
+          setMessages(prev => [...prev, assistantMessage]);
+          setVisibleCharts(prev => ({
+            ...prev,
+            [chartRequest]: true
+          }));
+        }
         return;
       } else {
         // User asked for a chart that doesn't exist
@@ -293,6 +327,18 @@ function isChartRequest(message: string): boolean {
           monthlyRent: newUserData.monthlyRent,
           downPaymentPercent: newUserData.downPaymentPercent
         });
+        
+        // If this is a chart request, wait a moment for calculation to complete
+        if (isAskingForChart && chartRequest) {
+          setTimeout(() => {
+            console.log('🔄 Re-checking chart data after calculation...');
+            // Force re-render by updating visible charts
+            setVisibleCharts(prev => ({
+              ...prev,
+              [chartRequest]: true
+            }));
+          }, 100);
+        }
       }
     }
   };
