@@ -78,6 +78,7 @@ export function ChatContainer() {
 // Track if charts are ready to show (data calculated)
 const [chartsReady, setChartsReady] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [saveProgress, setSaveProgress] = useState<number | null>(null); // Track PDF save progress
   
   // Restart modal state
   const [showRestartModal, setShowRestartModal] = useState(false);
@@ -98,6 +99,8 @@ const [chartsReady, setChartsReady] = useState(false);
   // Handle save chat as PDF
   const handleSaveChat = async () => {
     try {
+      setSaveProgress(0); // Start progress
+      
       // Create new PDF document
       const pdf = new jsPDF('p', 'mm', 'a4');
       const pageWidth = pdf.internal.pageSize.getWidth();
@@ -147,8 +150,13 @@ const [chartsReady, setChartsReady] = useState(false);
       yPosition += 5; // Extra space before conversation
       
       // Process each message
-      for (const message of messages) {
+      const totalMessages = messages.length;
+      for (let i = 0; i < messages.length; i++) {
+        const message = messages[i];
         const role = message.role === 'user' ? 'You' : 'AI Assistant';
+        
+        // Update progress (10% for setup, 80% for messages, 10% for finalization)
+        setSaveProgress(10 + Math.floor((i / totalMessages) * 80));
         
         // Add message header
         addText(`${role}:`, 12, true);
@@ -205,12 +213,21 @@ const [chartsReady, setChartsReady] = useState(false);
       }
       
       // Save the PDF
+      setSaveProgress(95);
       const fileName = `rentvsbuy-analysis-${new Date().toISOString().split('T')[0]}.pdf`;
       pdf.save(fileName);
+      
+      setSaveProgress(100);
+      
+      // Hide progress after a short delay
+      setTimeout(() => {
+        setSaveProgress(null);
+      }, 500);
       
     } catch (error) {
       console.error('Error generating PDF:', error);
       alert('Failed to generate PDF. Please try again.');
+      setSaveProgress(null); // Hide progress on error
     }
   };
 
@@ -595,6 +612,43 @@ const handleChipClick = (message: string) => {
                 Yes, Restart
               </button>
             </div>
+          </div>
+        </div>
+      )}
+      
+      {/* Save Progress Modal */}
+      {saveProgress !== null && (
+        <div className="modal-overlay">
+          <div className="progress-modal">
+            <div className="progress-circle">
+              <svg className="progress-ring" width="120" height="120">
+                <circle
+                  className="progress-ring-circle-bg"
+                  stroke="#e0e0e0"
+                  strokeWidth="8"
+                  fill="transparent"
+                  r="52"
+                  cx="60"
+                  cy="60"
+                />
+                <circle
+                  className="progress-ring-circle"
+                  stroke="#4CAF50"
+                  strokeWidth="8"
+                  fill="transparent"
+                  r="52"
+                  cx="60"
+                  cy="60"
+                  style={{
+                    strokeDasharray: `${2 * Math.PI * 52}`,
+                    strokeDashoffset: `${2 * Math.PI * 52 * (1 - saveProgress / 100)}`,
+                    transition: 'stroke-dashoffset 0.3s ease'
+                  }}
+                />
+              </svg>
+              <div className="progress-text">{saveProgress}%</div>
+            </div>
+            <p className="progress-label">Generating PDF...</p>
           </div>
         </div>
       )}

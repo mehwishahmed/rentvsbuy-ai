@@ -402,3 +402,47 @@ body {
 .confirm-button:active, .cancel-button:active {
   transform: translateY(0);
 }
+
+/* Progress Modal Styles */
+.progress-modal {
+  background: white;
+  padding: 40px;
+  border-radius: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  animation: modalSlideIn 0.2s ease-out;
+}
+
+.progress-circle {
+  position: relative;
+  width: 120px;
+  height: 120px;
+}
+
+.progress-ring {
+  transform: rotate(-90deg);
+}
+
+.progress-ring-circle {
+  stroke-linecap: round;
+}
+
+.progress-text {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 24px;
+  font-weight: 600;
+  color: #4CAF50;
+}
+
+.progress-label {
+  font-size: 16px;
+  color: #666;
+  font-weight: 500;
+  margin: 0;
+}
