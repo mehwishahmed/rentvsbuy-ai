@@ -1,5 +1,5 @@
 // src/components/charts/TotalCostChart.tsx
-
+// total costs chart
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from 'recharts';
 
 interface TotalCostChartProps {
