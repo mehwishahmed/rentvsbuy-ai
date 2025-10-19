@@ -6,7 +6,7 @@ An AI-powered financial advisor that helps you make informed decisions about whe
 
 RentVsBuy.ai is a web application that analyzes your housing situation and provides data-driven comparisons between buying a home and continuing to rent. Unlike traditional calculators, this tool uses AI to have natural conversations with you, understand your financial situation, and generate visual comparisons tailored to your specific scenario.
 
-**Live Demo:** [Your deployment URL here]
+**Repository:** [github.com/mehwishahmed/rentvsbuy-ai](https://github.com/mehwishahmed/rentvsbuy-ai)
 
 ## ✨ Features
 
@@ -25,11 +25,19 @@ The app generates **5 comprehensive charts** to help you visualize your financia
 4. **Home Equity Buildup** - Visualizes how much equity you build in a home over time
 5. **Rent Growth vs Fixed Mortgage** - Demonstrates how rent increases over time while mortgage payments stay fixed
 
+### 📊 Key Insights Summary
+- Instant "Bottom Line" recommendation displayed in sidebar
+- Shows winner (Buying vs Renting) with 30-year savings
+- Monthly cost difference at a glance
+- Break-even year calculation
+- Risk assessment based on down payment percentage
+
 ### 🔄 Dynamic Scenario Testing
 - Test multiple scenarios in a single conversation
 - Change home price, rent, or down payment mid-chat
 - Historical charts remain visible for comparison
 - All suggestion chips refresh when you provide new data
+- Insights sidebar updates automatically with new scenarios
 
 ### 💾 Professional PDF Export
 - Save your entire conversation and all charts in a single PDF
@@ -56,7 +64,7 @@ All calculations use industry-standard formulas:
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/yourusername/rentvsbuy-ai.git
+   git clone https://github.com/mehwishahmed/rentvsbuy-ai.git
    cd rentvsbuy-ai
    ```
 
@@ -330,9 +338,8 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 ## 📧 Contact
 
-**Project Maintainer:** [Your Name]  
-**Email:** [Your Email]  
-**GitHub:** [@yourusername](https://github.com/yourusername)
+**Project Maintainer:** Mehwish Ahmed  
+**GitHub:** [@mehwishahmed](https://github.com/mehwishahmed)
 
 ---
 
