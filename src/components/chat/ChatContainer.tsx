@@ -12,6 +12,7 @@ import { getAIResponse } from '../../lib/ai/openai';
 import { EquityBuildupChart } from '../charts/EquityBuildupChart';
 import { RentGrowthChart } from '../charts/RentGrowthChart';
 import { SuggestionChips } from './SuggestionChips';
+import html2canvas from 'html2canvas';
 
 interface Message {
   id: string;
@@ -93,7 +94,7 @@ const [chartsReady, setChartsReady] = useState(false);
   } | null>(null);
   
   // Handle save chat
-  const handleSaveChat = () => {
+  const handleSaveChat = async () => {
     const scenario = userData.homePrice && userData.monthlyRent && userData.downPaymentPercent ? 
       `$${userData.homePrice.toLocaleString()}, $${userData.monthlyRent.toLocaleString()}, ${userData.downPaymentPercent}%` : 
       'Incomplete scenario';
@@ -103,7 +104,10 @@ const [chartsReady, setChartsReady] = useState(false);
     chatText += `Scenario: ${scenario}\n\n`;
     chatText += `=== Conversation ===\n\n`;
     
-    messages.forEach(message => {
+    // Collect chart images
+    const chartImages: string[] = [];
+    
+    for (const message of messages) {
       const role = message.role === 'user' ? 'You' : 'AI';
       chatText += `${role}: ${message.content}\n`;
       
@@ -124,21 +128,49 @@ const [chartsReady, setChartsReady] = useState(false);
         if (inputVals) {
           chatText += `   Values: $${inputVals.homePrice.toLocaleString()}, $${inputVals.monthlyRent.toLocaleString()}, ${inputVals.downPaymentPercent}%\n`;
         }
+        
+        // Try to capture the chart as image
+        const chartElement = document.querySelector(`[data-message-id="${message.id}"] .chart-wrapper`);
+        if (chartElement) {
+          try {
+            const canvas = await html2canvas(chartElement as HTMLElement);
+            const chartImageData = canvas.toDataURL('image/png');
+            chartImages.push(chartImageData);
+            chatText += `   [Chart image captured]\n`;
+          } catch (error) {
+            console.log('Could not capture chart image:', error);
+            chatText += `   [Chart image not available]\n`;
+          }
+        }
+        
         chatText += `\n`;
       } else {
         chatText += `\n`;
       }
-    });
+    }
     
-    const blob = new Blob([chatText], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `rentvsbuy-chat-${new Date().toISOString().split('T')[0]}.txt`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    // Save text file
+    const textBlob = new Blob([chatText], { type: 'text/plain' });
+    const textUrl = URL.createObjectURL(textBlob);
+    const textA = document.createElement('a');
+    textA.href = textUrl;
+    textA.download = `rentvsbuy-chat-${new Date().toISOString().split('T')[0]}.txt`;
+    document.body.appendChild(textA);
+    textA.click();
+    document.body.removeChild(textA);
+    URL.revokeObjectURL(textUrl);
+    
+    // Save chart images if any were captured
+    if (chartImages.length > 0) {
+      chartImages.forEach((imageData, index) => {
+        const link = document.createElement('a');
+        link.download = `rentvsbuy-chart-${index + 1}-${new Date().toISOString().split('T')[0]}.png`;
+        link.href = imageData;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      });
+    }
   };
 
   // Handle restart/reset
@@ -723,7 +755,7 @@ const handleChipClick = (message: string) => {
       
       <div className="messages-container">
         {messages.map(message => (
-          <div key={message.id}>
+          <div key={message.id} data-message-id={message.id}>
             <ChatMessage
               role={message.role}
               content={message.content}
