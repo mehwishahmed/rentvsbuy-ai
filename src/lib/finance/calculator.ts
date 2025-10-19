@@ -1,6 +1,6 @@
 // src/lib/finance/calculator.ts
 
-import type { ScenarioInputs, MonthlySnapshot, CalculatorOutput } from '../../types/calculator';
+import type { ScenarioInputs, MonthlySnapshot } from '../../types/calculator';
 
 // ===================================
 // FUNCTION #1: Calculate Monthly Mortgage Payment
