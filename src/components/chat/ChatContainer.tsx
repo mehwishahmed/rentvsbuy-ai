@@ -524,31 +524,38 @@ function extractUserData(message: string, currentData: UserData): UserData {
   const newData = { ...currentData };
   const lowerMessage = message.toLowerCase();
   
-  // Helper: Extract number from a single string (not comma-separated)
-  const extractSingleNumber = (str: string): number | null => {
-    // Match formats: 500000, $500k, $500,000 (with thousand separators)
-    const numMatch = str.match(/\$?\s*([\d,]+)k?\b/i);
-    if (numMatch) {
-      let num = parseFloat(numMatch[1].replace(/,/g, ''));
-      if (str.toLowerCase().includes('k')) {
-        num *= 1000;
-      }
-      return num;
+  // Extract ALL numbers from the message (handles various formats)
+  const extractAllNumbers = (str: string): number[] => {
+    const numbers: number[] = [];
+    
+    // Pattern 1: $500k or 500k (with k/K suffix)
+    const kPattern = /\$?\s*([\d,]+)k\b/gi;
+    let match;
+    while ((match = kPattern.exec(str)) !== null) {
+      const num = parseFloat(match[1].replace(/,/g, '')) * 1000;
+      numbers.push(num);
     }
-    return null;
+    
+    // Pattern 2: Regular numbers with or without $ and commas: $500,000 or 500000 or $500,000
+    const numPattern = /\$?\s*([\d,]+(?:\.\d+)?)/g;
+    const tempStr = str.replace(/\$?\s*([\d,]+)k\b/gi, ''); // Remove already matched k numbers
+    
+    while ((match = numPattern.exec(tempStr)) !== null) {
+      const cleaned = match[1].replace(/,/g, '');
+      // Only parse if it has actual digits and not just commas
+      if (cleaned && !isNaN(parseFloat(cleaned))) {
+        const num = parseFloat(cleaned);
+        // Avoid tiny numbers that are likely not what we want
+        if (num >= 0.1) {
+          numbers.push(num);
+        }
+      }
+    }
+    
+    return numbers;
   };
   
-  // Split by commas and extract all numbers
-  const parts = message.split(/,|\s+and\s+/); // Split by comma or "and"
-  const allNumbers: number[] = [];
-  
-  parts.forEach(part => {
-    const num = extractSingleNumber(part.trim());
-    if (num !== null) {
-      allNumbers.push(num);
-    }
-  });
-  
+  const allNumbers = extractAllNumbers(message);
   console.log('🔍 Found numbers:', allNumbers);
   
   // If only one number, use context clues
