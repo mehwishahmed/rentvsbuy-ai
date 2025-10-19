@@ -17,6 +17,7 @@ interface Message {
   id: string;
   role: 'user' | 'assistant';
   content: string;
+  chartToShow?: 'netWorth' | 'monthlyCost' | 'totalCost' | 'equity' | 'rentGrowth';
 }
 
 interface UserData {
@@ -113,16 +114,8 @@ function detectChartRequest(message: string): string | null {
     console.log('🔍 Extracted data:', newUserData);
     setUserData(newUserData);
     
-    // check if user is requesting a chart
-  if (chartsReady) {
-    const chartRequest = detectChartRequest(content);
-    if (chartRequest) {
-      setVisibleCharts(prev => ({
-        ...prev,
-        [chartRequest]: true
-      }));
-    }
-  }
+    // check if user is requesting a chart (we'll handle this after AI response)
+  const chartRequest = chartsReady ? detectChartRequest(content) : null;
 
     // Get AI response
     const allMessages = [...messages, userMessage].map(m => ({
@@ -135,11 +128,20 @@ function detectChartRequest(message: string): string | null {
     const assistantMessage: Message = {
       id: (Date.now() + 1).toString(),
       role: 'assistant',
-      content: botResponse
+      content: botResponse,
+      chartToShow: chartRequest ? (chartRequest as 'netWorth' | 'monthlyCost' | 'totalCost' | 'equity' | 'rentGrowth') : undefined
     };
     
     // Add bot response
     setMessages(prev => [...prev, assistantMessage]);
+    
+    // Mark chart as visible if requested
+    if (chartRequest) {
+      setVisibleCharts(prev => ({
+        ...prev,
+        [chartRequest]: true
+      }));
+    }
     
     // If we have all data, calculate and show charts
     if (newUserData.homePrice && newUserData.monthlyRent && newUserData.downPaymentPercent) {
@@ -169,7 +171,7 @@ const handleChipClick = (message: string) => {
       [chartRequest]: true
     }));
     
-    // Add a brief bot response
+    // Add a brief bot response WITH chart attached
     const chartNames: { [key: string]: string } = {
       netWorth: 'net worth comparison',
       monthlyCost: 'monthly costs breakdown',
@@ -181,7 +183,8 @@ const handleChipClick = (message: string) => {
     const botMessage: Message = {
       id: (Date.now() + 1).toString(),
       role: 'assistant',
-      content: `Here's the ${chartNames[chartRequest]}!`
+      content: `Here's the ${chartNames[chartRequest]}!`,
+      chartToShow: chartRequest as 'netWorth' | 'monthlyCost' | 'totalCost' | 'equity' | 'rentGrowth'
     };
     setMessages(prev => [...prev, botMessage]);
   } else {
@@ -285,6 +288,59 @@ const handleChipClick = (message: string) => {
     });
   };
   
+  // Helper function to render chart based on type
+  const renderChart = (chartType: string) => {
+    if (!chartData || !chartsReady) return null;
+    
+    switch (chartType) {
+      case 'netWorth':
+        return (
+          <div className="chart-wrapper">
+            <NetWorthChart data={chartData} />
+          </div>
+        );
+      case 'monthlyCost':
+        return monthlyCosts ? (
+          <div className="chart-wrapper">
+            <MonthlyCostChart 
+              buyingCosts={monthlyCosts.buying}
+              rentingCosts={monthlyCosts.renting}
+            />
+          </div>
+        ) : null;
+      case 'totalCost':
+        return totalCostData ? (
+          <div className="chart-wrapper">
+            <TotalCostChart 
+              buyerFinalNetWorth={totalCostData.buyerFinalNetWorth}
+              renterFinalNetWorth={totalCostData.renterFinalNetWorth}
+              totalBuyingCosts={totalCostData.totalBuyingCosts}
+              totalRentingCosts={totalCostData.totalRentingCosts}
+              finalHomeValue={totalCostData.finalHomeValue}
+              finalInvestmentValue={totalCostData.finalInvestmentValue}
+            />
+          </div>
+        ) : null;
+      case 'equity':
+        return (
+          <div className="chart-wrapper">
+            <EquityBuildupChart data={chartData} />
+          </div>
+        );
+      case 'rentGrowth':
+        return monthlyCosts ? (
+          <div className="chart-wrapper">
+            <RentGrowthChart 
+              data={chartData} 
+              monthlyMortgage={monthlyCosts.buying.mortgage}
+            />
+          </div>
+        ) : null;
+      default:
+        return null;
+    }
+  };
+
   return (
     <div className="chat-container">
       <div className="chat-header">
@@ -293,66 +349,22 @@ const handleChipClick = (message: string) => {
       
       <div className="messages-container">
         {messages.map(message => (
-          <ChatMessage
-            key={message.id}
-            role={message.role}
-            content={message.content}
-          />
+          <div key={message.id}>
+            <ChatMessage
+              role={message.role}
+              content={message.content}
+            />
+            {/* Render chart right after message if it has one */}
+            {message.chartToShow && renderChart(message.chartToShow)}
+          </div>
         ))}
         
-        {/* ADD CHIPS HERE ⬇️ */}
+        {/* ADD CHIPS AT THE END */}
         {chartsReady && (
           <SuggestionChips 
             onChipClick={handleChipClick}
             visibleCharts={visibleCharts}
           />
-        )}
-
-        {chartData && chartsReady && (
-          <>
-            {visibleCharts.netWorth && (
-              <div className="chart-wrapper">
-                <NetWorthChart data={chartData} />
-              </div>
-            )}
-  
-            {visibleCharts.monthlyCost && monthlyCosts && (
-              <div className="chart-wrapper">
-                <MonthlyCostChart 
-                  buyingCosts={monthlyCosts.buying}
-                  rentingCosts={monthlyCosts.renting}
-                />
-              </div>
-            )}
-  
-            {visibleCharts.totalCost && totalCostData && (
-              <div className="chart-wrapper">
-                <TotalCostChart 
-                  buyerFinalNetWorth={totalCostData.buyerFinalNetWorth}
-                  renterFinalNetWorth={totalCostData.renterFinalNetWorth}
-                  totalBuyingCosts={totalCostData.totalBuyingCosts}
-                  totalRentingCosts={totalCostData.totalRentingCosts}
-                  finalHomeValue={totalCostData.finalHomeValue}
-                  finalInvestmentValue={totalCostData.finalInvestmentValue}
-                />
-              </div>
-            )}
-  
-            {visibleCharts.equity && (
-              <div className="chart-wrapper">
-                <EquityBuildupChart data={chartData} />
-              </div>
-            )}
-  
-            {visibleCharts.rentGrowth && monthlyCosts && (
-              <div className="chart-wrapper">
-                <RentGrowthChart 
-                  data={chartData} 
-                  monthlyMortgage={monthlyCosts.buying.mortgage}
-                />
-              </div>
-            )}
-          </>
         )}
       </div>
       
