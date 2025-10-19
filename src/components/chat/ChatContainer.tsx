@@ -227,75 +227,77 @@ export function ChatContainer() {
 // Extract numbers from user messages
 
 // Extract numbers from user messages with better context awareness
+// Extract numbers from user messages - handles multiple values at once!
 function extractUserData(message: string, currentData: UserData): UserData {
   const newData = { ...currentData };
   const lowerMessage = message.toLowerCase();
   
-  // Helper: Extract first number from message
-  const extractNumber = (str: string): number | null => {
-    // Handle formats: 500000, 500,000, $500k, $500,000
-    const numMatch = str.match(/\$?\s*([\d,]+)k?/i);
-    if (numMatch) {
-      let num = parseFloat(numMatch[1].replace(/,/g, ''));
-      if (str.toLowerCase().includes('k')) {
+  // Helper: Extract all numbers from message
+  const extractAllNumbers = (str: string): number[] => {
+    const numbers: number[] = [];
+    const regex = /\$?\s*([\d,]+)k?\b/gi;
+    let match;
+    
+    while ((match = regex.exec(str)) !== null) {
+      let num = parseFloat(match[1].replace(/,/g, ''));
+      // Check if 'k' appears within 2 characters after the number
+      const afterMatch = str.slice(match.index, match.index + match[0].length + 2);
+      if (afterMatch.toLowerCase().includes('k')) {
         num *= 1000;
       }
-      return num;
+      numbers.push(num);
     }
-    return null;
+    return numbers;
   };
   
-  // RULE 1: If message contains "house" or "home" or "price" → extract home price
-  if ((lowerMessage.includes('house') || lowerMessage.includes('home') || lowerMessage.includes('price')) 
-      && !lowerMessage.includes('rent')) {
-    const price = extractNumber(message);
-    if (price && price > 50000) {
-      newData.homePrice = price;
-      return newData;
-    }
-  }
+  const allNumbers = extractAllNumbers(message);
   
-  // RULE 2: If message contains "rent" → extract rent
-  if (lowerMessage.includes('rent') || lowerMessage.includes('paying')) {
-    const rent = extractNumber(message);
-    if (rent && rent >= 500 && rent <= 50000) {
-      newData.monthlyRent = rent;
-      return newData;
-    }
-  }
-  
-  // RULE 3: If message contains "%" or "percent" → extract down payment
-  if (lowerMessage.includes('%') || lowerMessage.includes('percent') || lowerMessage.includes('down')) {
-    const downMatch = message.match(/(\d+)\s*%|(\d+)\s*percent/i);
-    if (downMatch) {
-      const down = parseFloat(downMatch[1] || downMatch[2]);
-      if (down >= 1 && down <= 100) {
-        newData.downPaymentPercent = down;
-        return newData;
+  // RULE 1: Extract home price (look for keywords or big numbers)
+  if (!newData.homePrice) {
+    if (lowerMessage.includes('house') || lowerMessage.includes('home') || lowerMessage.includes('price')) {
+      const price = allNumbers.find(n => n > 50000);
+      if (price) {
+        newData.homePrice = price;
+      }
+    } else {
+      // Fallback: biggest number over 50k
+      const bigNumber = allNumbers.find(n => n > 50000);
+      if (bigNumber) {
+        newData.homePrice = bigNumber;
       }
     }
   }
   
-  // RULE 4: SMART FALLBACK - If none of the above matched, but we found a number
-  // Use context from what's missing
-  const num = extractNumber(message);
-  if (num) {
-    // If we're missing home price and number is big enough
-    if (!newData.homePrice && num > 50000) {
-      newData.homePrice = num;
-      return newData;
+  // RULE 2: Extract rent (look for keywords or medium numbers)
+  if (!newData.monthlyRent) {
+    if (lowerMessage.includes('rent') || lowerMessage.includes('paying')) {
+      const rent = allNumbers.find(n => n >= 500 && n <= 50000 && n !== newData.homePrice);
+      if (rent) {
+        newData.monthlyRent = rent;
+      }
+    } else {
+      // Fallback: medium number in rent range
+      const rentRange = allNumbers.find(n => n >= 500 && n <= 50000 && n !== newData.homePrice);
+      if (rentRange) {
+        newData.monthlyRent = rentRange;
+      }
     }
-    
-    // If we're missing rent and number is in rent range
-    if (!newData.monthlyRent && num >= 500 && num <= 50000) {
-      newData.monthlyRent = num;
-      return newData;
-    }
-    
-    // If we're missing down payment and number is percentage-sized
-    if (!newData.downPaymentPercent && num >= 1 && num <= 100) {
-      newData.downPaymentPercent = num;
-      return newData;
+  }
+  
+  // RULE 3: Extract down payment % (look for % or small numbers)
+  if (!newData.downPaymentPercent) {
+    const percentMatch = message.match(/(\d+)\s*%|(\d+)\s*percent/i);
+    if (percentMatch) {
+      const down = parseFloat(percentMatch[1] || percentMatch[2]);
+      if (down >= 1 && down <= 100) {
+        newData.downPaymentPercent = down;
+      }
+    } else {
+      // Fallback: small number (1-100 range)
+      const smallNum = allNumbers.find(n => n >= 1 && n <= 100 && n !== newData.homePrice && n !== newData.monthlyRent);
+      if (smallNum) {
+        newData.downPaymentPercent = smallNum;
+      }
     }
   }
   
