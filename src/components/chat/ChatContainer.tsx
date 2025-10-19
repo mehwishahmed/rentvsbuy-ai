@@ -618,30 +618,10 @@ const handleChipClick = (message: string) => {
   };
   
   return (
-    <div className="chat-container">
-      <div className="chat-header">
-        <h1>RentVsBuy.ai</h1>
-        <div className="header-buttons">
-          <button 
-            className="save-button"
-            onClick={handleSaveChat}
-            title="Save current chat"
-          >
-            💾 Save Chat
-          </button>
-          <button 
-            className="restart-button"
-            onClick={() => setShowRestartModal(true)}
-            title="Start over"
-          >
-Restart
-          </button>
-        </div>
-      </div>
-      
-      <div className="messages-container">
-        {/* Key Insights Summary */}
-        {insights && (
+    <div className="app-layout">
+      {/* Insights Sidebar */}
+      {insights && (
+        <div className="insights-sidebar">
           <div className="insights-summary">
             <div className="insights-header">
               <h3>📊 Bottom Line</h3>
@@ -680,8 +660,31 @@ Restart
               </div>
             </div>
           </div>
-        )}
-        
+        </div>
+      )}
+      
+    <div className="chat-container">
+      <div className="chat-header">
+        <h1>RentVsBuy.ai</h1>
+          <div className="header-buttons">
+            <button 
+              className="save-button"
+              onClick={handleSaveChat}
+              title="Save current chat"
+            >
+              💾 Save Chat
+            </button>
+            <button 
+              className="restart-button"
+              onClick={() => setShowRestartModal(true)}
+              title="Start over"
+            >
+Restart
+            </button>
+          </div>
+      </div>
+      
+      <div className="messages-container">
         {messages.map(message => (
           <div key={message.id} data-message-id={message.id}>
           <ChatMessage
@@ -715,11 +718,12 @@ Restart
       
       <ChatInput onSend={handleSendMessage} />
       
-      {/* Footer */}
-      <div className="chat-footer">
-        <span>RentVsBuy.ai v1.0</span>
-        <span>•</span>
-        <span>Built with AI-powered insights</span>
+        {/* Footer */}
+        <div className="chat-footer">
+          <span>RentVsBuy.ai v1.0</span>
+          <span>•</span>
+          <span>Built with AI-powered insights</span>
+        </div>
       </div>
       
       {/* Restart Confirmation Modal */}
