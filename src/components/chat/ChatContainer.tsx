@@ -96,6 +96,45 @@ const [chartsReady, setChartsReady] = useState(false);
     finalInvestmentValue: number;
   } | null>(null);
   
+  // Calculate key insights for summary
+  const getKeyInsights = () => {
+    if (!chartData || !monthlyCosts || !totalCostData || !userData.homePrice || !userData.monthlyRent || !userData.downPaymentPercent) {
+      return null;
+    }
+
+    const netWorthDiff = totalCostData.buyerFinalNetWorth - totalCostData.renterFinalNetWorth;
+    const winner = netWorthDiff > 0 ? 'buying' : 'renting';
+    const savings = Math.abs(netWorthDiff);
+    
+    const monthlyDiff = monthlyCosts.buying.total - monthlyCosts.renting.total;
+    
+    // Find break-even point (where buying net worth exceeds renting)
+    let breakEvenYear = 30;
+    for (let i = 0; i < chartData.length; i++) {
+      if (chartData[i].buyerNetWorth > chartData[i].renterNetWorth) {
+        breakEvenYear = Math.floor(i / 12) + 1;
+        break;
+      }
+    }
+
+    // Risk assessment based on down payment
+    let risk = 'Low';
+    if (userData.downPaymentPercent < 10) risk = 'High';
+    else if (userData.downPaymentPercent < 20) risk = 'Medium';
+
+    return {
+      winner,
+      savings,
+      monthlyDiff,
+      breakEvenYear,
+      risk,
+      buyingMonthly: monthlyCosts.buying.total,
+      rentingMonthly: monthlyCosts.renting.total
+    };
+  };
+
+  const insights = getKeyInsights();
+  
   // Handle save chat as PDF
   const handleSaveChat = async () => {
     try {
@@ -370,8 +409,8 @@ function shouldShowChart(aiResponse: string): string | null {
         equity: false,
         rentGrowth: false
       });
-    }
-    
+  }
+
     // Get AI response
     const allMessages = [...messages, userMessage].map(m => ({
       role: m.role,
@@ -601,6 +640,48 @@ Restart
       </div>
       
       <div className="messages-container">
+        {/* Key Insights Summary */}
+        {insights && (
+          <div className="insights-summary">
+            <div className="insights-header">
+              <h3>📊 Bottom Line</h3>
+              <span className={`risk-badge risk-${insights.risk.toLowerCase()}`}>{insights.risk} Risk</span>
+            </div>
+            
+            <div className="insights-grid">
+              <div className="insight-card primary">
+                <div className="insight-label">Recommendation</div>
+                <div className="insight-value winner">
+                  {insights.winner === 'buying' ? '🏠 Buying Wins' : '🏘️ Renting Wins'}
+                </div>
+                <div className="insight-detail">
+                  Save ${(insights.savings / 1000).toFixed(0)}k over 30 years
+                </div>
+              </div>
+              
+              <div className="insight-card">
+                <div className="insight-label">Monthly Difference</div>
+                <div className="insight-value">
+                  {insights.monthlyDiff > 0 ? '+' : ''}${Math.abs(insights.monthlyDiff).toFixed(0)}/mo
+                </div>
+                <div className="insight-detail">
+                  {insights.monthlyDiff > 0 
+                    ? 'Buying costs more monthly' 
+                    : 'Renting costs more monthly'}
+                </div>
+              </div>
+              
+              <div className="insight-card">
+                <div className="insight-label">Break-Even Point</div>
+                <div className="insight-value">Year {insights.breakEvenYear}</div>
+                <div className="insight-detail">
+                  When buying starts paying off
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+        
         {messages.map(message => (
           <div key={message.id} data-message-id={message.id}>
           <ChatMessage
@@ -662,9 +743,9 @@ Restart
               </button>
             </div>
           </div>
-        </div>
-      )}
-      
+              </div>
+            )}
+  
       {/* Save Progress Modal */}
       {saveProgress !== null && (
         <div className="modal-overlay">
@@ -696,11 +777,11 @@ Restart
                 />
               </svg>
               <div className="progress-text">{saveProgress}%</div>
-            </div>
+              </div>
             <p className="progress-label">Generating PDF...</p>
-          </div>
-        </div>
-      )}
+              </div>
+              </div>
+            )}
     </div>
   );
   
