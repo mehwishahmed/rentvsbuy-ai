@@ -247,12 +247,13 @@ const [chartsReady, setChartsReady] = useState(false);
 function shouldShowChart(aiResponse: string): string | null {
   const lower = aiResponse.toLowerCase();
   
-  // Only trigger on exact phrases that clearly indicate showing a chart
-  if (lower.includes("here's your net worth comparison")) return 'netWorth';
-  if (lower.includes("here's your monthly costs breakdown")) return 'monthlyCost';
-  if (lower.includes("here's your total cost comparison")) return 'totalCost';
-  if (lower.includes("here's your equity buildup")) return 'equity';
-  if (lower.includes("here's your rent growth")) return 'rentGrowth';
+  // Check for chart trigger phrases (allows for "updated", "new", etc.)
+  // Match patterns like: "here's your [updated/new] net worth comparison"
+  if (lower.match(/here'?s your (updated |new )?net worth comparison/)) return 'netWorth';
+  if (lower.match(/here'?s your (updated |new )?monthly costs breakdown/)) return 'monthlyCost';
+  if (lower.match(/here'?s your (updated |new )?total cost comparison/)) return 'totalCost';
+  if (lower.match(/here'?s your (updated |new )?equity buildup/)) return 'equity';
+  if (lower.match(/here'?s your (updated |new )?rent growth/)) return 'rentGrowth';
   
   return null;
 }
