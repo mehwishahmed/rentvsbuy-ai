@@ -291,7 +291,98 @@ function shouldShowChart(aiResponse: string): string | null {
     console.log('🔍 Extracted data:', newUserData);
     setUserData(newUserData);
     
-    // Get AI response first
+    // Check if we have all data and if it changed
+    const hasAllData = newUserData.homePrice && newUserData.monthlyRent && newUserData.downPaymentPercent;
+    const dataChanged = 
+      newUserData.homePrice !== userData.homePrice ||
+      newUserData.monthlyRent !== userData.monthlyRent ||
+      newUserData.downPaymentPercent !== userData.downPaymentPercent;
+    
+    // If data changed, we need to recalculate charts BEFORE showing them
+    let freshChartData = chartData;
+    let freshMonthlyCosts = monthlyCosts;
+    let freshTotalCostData = totalCostData;
+    
+    if (hasAllData && dataChanged) {
+      console.log('🔄 Data changed! Recalculating charts with new data...');
+      
+      // Calculate fresh data synchronously
+      const inputs = {
+        homePrice: newUserData.homePrice!,
+        downPaymentPercent: newUserData.downPaymentPercent!,
+        interestRate: 7.0,
+        loanTermYears: 30,
+        propertyTaxRate: 1.0,
+        homeInsuranceAnnual: 1200,
+        hoaMonthly: 150,
+        maintenanceRate: 1.0,
+        homeAppreciationRate: 3.0,
+        monthlyRent: newUserData.monthlyRent!,
+        rentGrowthRate: 3.5,
+        renterInsuranceAnnual: 240,
+        investmentReturnRate: 7.0
+      } as ScenarioInputs;
+      
+      // Calculate net worth comparison
+      const snapshots = calculateNetWorthComparison(inputs);
+      freshChartData = snapshots;
+      
+      // Calculate monthly costs
+      const buying = calculateBuyingCosts(inputs);
+      const renting = calculateRentingCosts(inputs, 1);
+      freshMonthlyCosts = {
+        buying: {
+          mortgage: buying.mortgage,
+          propertyTax: buying.propertyTax,
+          insurance: buying.insurance,
+          hoa: buying.hoa,
+          maintenance: buying.maintenance,
+          total: buying.total
+        },
+        renting: {
+          rent: renting.monthlyRent,
+          insurance: renting.insurance,
+          total: renting.total
+        }
+      };
+      
+      // Calculate total costs over 30 years
+      const month360 = snapshots[359]; // Last month (year 30)
+      const totalBuyingCosts = snapshots.reduce((sum, s) => sum + s.monthlyBuyingCosts, 0);
+      const totalRentingCosts = snapshots.reduce((sum, s) => sum + s.monthlyRentingCosts, 0);
+      
+      freshTotalCostData = {
+        buyerFinalNetWorth: month360.buyerNetWorth,
+        renterFinalNetWorth: month360.renterNetWorth,
+        totalBuyingCosts,
+        totalRentingCosts,
+        finalHomeValue: month360.homeValue,
+        finalInvestmentValue: month360.investedDownPayment
+      };
+      
+      // Update state
+      setChartData(freshChartData);
+      setMonthlyCosts(freshMonthlyCosts);
+      setTotalCostData(freshTotalCostData);
+      setChartsReady(true);
+      
+      // Reset visible charts (all become available again)
+      setVisibleCharts({
+        netWorth: false,
+        monthlyCost: false,
+        totalCost: false,
+        equity: false,
+        rentGrowth: false
+      });
+      
+      console.log('✅ Fresh charts calculated with:', {
+        homePrice: newUserData.homePrice,
+        monthlyRent: newUserData.monthlyRent,
+        downPaymentPercent: newUserData.downPaymentPercent
+      });
+    }
+    
+    // Get AI response
     const allMessages = [...messages, userMessage].map(m => ({
       role: m.role,
       content: m.content
@@ -303,7 +394,7 @@ function shouldShowChart(aiResponse: string): string | null {
     const chartToShow = shouldShowChart(botResponse);
     
     let assistantMessage: Message;
-    if (chartToShow && chartsReady && chartData && monthlyCosts && totalCostData) {
+    if (chartToShow && (chartsReady || hasAllData) && freshChartData && freshMonthlyCosts && freshTotalCostData) {
       // AI wants to show a chart and we have the data
       assistantMessage = {
         id: (Date.now() + 1).toString(),
@@ -311,9 +402,9 @@ function shouldShowChart(aiResponse: string): string | null {
         content: botResponse,
         chartToShow: chartToShow as 'netWorth' | 'monthlyCost' | 'totalCost' | 'equity' | 'rentGrowth',
         snapshotData: {
-          chartData: chartData,
-          monthlyCosts: monthlyCosts,
-          totalCostData: totalCostData,
+          chartData: freshChartData,
+          monthlyCosts: freshMonthlyCosts,
+          totalCostData: freshTotalCostData,
           inputValues: {
             homePrice: newUserData.homePrice!,
             monthlyRent: newUserData.monthlyRent!,
@@ -340,40 +431,10 @@ function shouldShowChart(aiResponse: string): string | null {
     setMessages(prev => [...prev, assistantMessage]);
     setIsLoading(false);
     
-    // If we have all data, calculate charts (regenerate if data changed)
-    if (newUserData.homePrice && newUserData.monthlyRent && newUserData.downPaymentPercent) {
-      // Check if data changed
-      const dataChanged = 
-        newUserData.homePrice !== userData.homePrice ||
-        newUserData.monthlyRent !== userData.monthlyRent ||
-        newUserData.downPaymentPercent !== userData.downPaymentPercent;
-      
-      if (!chartsReady || dataChanged) {
-        console.log('📊 Generating charts...', newUserData, chartsReady ? '(data changed)' : '(initial)');
-        
-        // If data changed, reset visible charts (all become available again)
-        if (dataChanged && chartsReady) {
-          console.log('🔄 Data changed! Resetting chart visibility...');
-          setVisibleCharts({
-            netWorth: false,
-            monthlyCost: false,
-            totalCost: false,
-            equity: false,
-            rentGrowth: false
-          });
-        }
-        
-        // Important: Calculate charts with the NEW data
+    // If we have all data and haven't calculated yet (initial case, not data change)
+    if (hasAllData && !chartsReady && !dataChanged) {
+      console.log('📊 Initial chart generation...');
       calculateAndShowChart(newUserData);
-        
-        // Log to verify correct values are being used
-        console.log('✅ Charts will be calculated with:', {
-          homePrice: newUserData.homePrice,
-          monthlyRent: newUserData.monthlyRent,
-          downPaymentPercent: newUserData.downPaymentPercent
-        });
-        
-      }
     }
   };
   
@@ -671,6 +732,14 @@ function extractUserData(message: string, currentData: UserData): UserData {
   const newData = { ...currentData };
   const lowerMessage = message.toLowerCase();
   
+  // Check if user is providing NEW values (overwrite mode)
+  const isNewData = lowerMessage.includes('new') || 
+                    lowerMessage.includes('try') || 
+                    lowerMessage.includes('different') ||
+                    lowerMessage.includes('change') ||
+                    lowerMessage.includes('instead') ||
+                    lowerMessage.includes('now');
+  
   // Extract ALL numbers from the message (handles various formats)
   const extractAllNumbers = (str: string): number[] => {
     const numbers: number[] = [];
@@ -704,21 +773,23 @@ function extractUserData(message: string, currentData: UserData): UserData {
   
   const allNumbers = extractAllNumbers(message);
   console.log('🔍 Found numbers:', allNumbers);
+  console.log('🔄 Is new data?', isNewData);
+  console.log('📝 Message:', lowerMessage);
   
   // If only one number, use context clues
   if (allNumbers.length === 1) {
     const num = allNumbers[0];
     
     // Home price (big number or has keywords)
-    if (!newData.homePrice && (num > 50000 || lowerMessage.includes('house') || lowerMessage.includes('home') || lowerMessage.includes('price'))) {
+    if ((isNewData || !newData.homePrice) && (num > 50000 || lowerMessage.includes('house') || lowerMessage.includes('home') || lowerMessage.includes('price'))) {
       newData.homePrice = num;
     }
     // Rent (medium number or has keywords)
-    else if (!newData.monthlyRent && (num >= 500 && num <= 50000 || lowerMessage.includes('rent'))) {
+    else if ((isNewData || !newData.monthlyRent) && (num >= 500 && num <= 50000 || lowerMessage.includes('rent'))) {
       newData.monthlyRent = num;
     }
     // Down payment (small number or has keywords)
-    else if (!newData.downPaymentPercent && (num >= 1 && num <= 100 || lowerMessage.includes('%') || lowerMessage.includes('down'))) {
+    else if ((isNewData || !newData.downPaymentPercent) && (num >= 1 && num <= 100 || lowerMessage.includes('%') || lowerMessage.includes('down'))) {
       newData.downPaymentPercent = num;
     }
   }
@@ -727,20 +798,29 @@ function extractUserData(message: string, currentData: UserData): UserData {
   else if (allNumbers.length >= 2) {
     allNumbers.sort((a, b) => b - a); // Sort largest to smallest
     
+    // Detect if all 3 values are present - if so, it's a complete new scenario
+    const hasLargeNumber = allNumbers.some(n => n > 50000);
+    const hasMediumNumber = allNumbers.some(n => n >= 500 && n <= 50000);
+    const hasSmallNumber = allNumbers.some(n => n >= 1 && n <= 100);
+    const isCompleteScenario = hasLargeNumber && hasMediumNumber && hasSmallNumber;
+    
+    // If we have all 3 types of numbers in one message, treat as new scenario (overwrite)
+    const shouldOverwrite = isNewData || isCompleteScenario;
+    
     // Biggest number = home price
-    if (!newData.homePrice && allNumbers[0] > 50000) {
+    if ((shouldOverwrite || !newData.homePrice) && allNumbers[0] > 50000) {
       newData.homePrice = allNumbers[0];
     }
     
     // Medium number = rent
     const rentNumber = allNumbers.find(n => n >= 500 && n <= 50000);
-    if (!newData.monthlyRent && rentNumber) {
+    if ((shouldOverwrite || !newData.monthlyRent) && rentNumber) {
       newData.monthlyRent = rentNumber;
     }
     
     // Small number = down payment %
     const downNumber = allNumbers.find(n => n >= 1 && n <= 100 && n !== rentNumber);
-    if (!newData.downPaymentPercent && downNumber) {
+    if ((shouldOverwrite || !newData.downPaymentPercent) && downNumber) {
       newData.downPaymentPercent = downNumber;
     }
   }
