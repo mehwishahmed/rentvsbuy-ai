@@ -127,8 +127,8 @@ const [chartsReady, setChartsReady] = useState(false);
           pdf.setFont('helvetica', 'normal');
         }
         
-        // Remove emojis that cause random symbols
-        const cleanText = text.replace(/[📊🏠💵💰]/g, '').trim();
+        // Remove emojis that cause random symbols in PDF
+        const cleanText = text.replace(/[📊🏠💵💰🔄💾]/g, '').trim();
         
         const lines = pdf.splitTextToSize(cleanText, pageWidth - 2 * margin);
         checkNewPage(lines.length * fontSize * 0.35 + 3);
@@ -553,7 +553,7 @@ const handleChipClick = (message: string) => {
             onClick={() => setShowRestartModal(true)}
             title="Start over"
           >
-            🔄 Restart
+Restart
           </button>
         </div>
       </div>
