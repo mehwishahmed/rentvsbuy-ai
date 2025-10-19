@@ -40,6 +40,17 @@ export function ChatContainer() {
   });
   
   const [chartData, setChartData] = useState<MonthlySnapshot[] | null>(null);
+  // Track which charts are visible
+  const [visibleCharts, setVisibleCharts] = useState({
+  netWorth: false,
+  monthlyCost: false,
+  totalCost: false,
+  equity: false,
+  rentGrowth: false
+});
+
+// Track if charts are ready to show (data calculated)
+const [chartsReady, setChartsReady] = useState(false);
   const [monthlyCosts, setMonthlyCosts] = useState<{
     buying: any;
     renting: any;
@@ -54,6 +65,38 @@ export function ChatContainer() {
     finalInvestmentValue: number;
   } | null>(null);
   
+  // Detect which chart user is asking for
+function detectChartRequest(message: string): string | null {
+  const lower = message.toLowerCase();
+  
+  // Net worth chart keywords
+  if (lower.includes('net worth') || lower.includes('wealth') || lower.includes('richer') || lower.includes('comparison')) {
+    return 'netWorth';
+  }
+  
+  // Monthly cost chart keywords
+  if (lower.includes('monthly') || lower.includes('afford') || lower.includes('cost breakdown') || lower.includes('per month')) {
+    return 'monthlyCost';
+  }
+  
+  // Total cost chart keywords
+  if (lower.includes('total cost') || lower.includes('30 year') || lower.includes('overall') || lower.includes('winner')) {
+    return 'totalCost';
+  }
+  
+  // Equity chart keywords
+  if (lower.includes('equity') || lower.includes('own') || lower.includes('ownership')) {
+    return 'equity';
+  }
+  
+  // Rent growth chart keywords
+  if (lower.includes('rent grow') || lower.includes('rent increase') || lower.includes('mortgage vs rent')) {
+    return 'rentGrowth';
+  }
+  
+  return null;
+}
+
   const handleSendMessage = async (content: string) => {
     // Add user message
     const userMessage: Message = {
@@ -69,6 +112,17 @@ export function ChatContainer() {
     console.log('🔍 Extracted data:', newUserData);
     setUserData(newUserData);
     
+    // check if user is requesting a chart
+  if (chartsReady) {
+    const chartRequest = detectChartRequest(content);
+    if (chartRequest) {
+      setVisibleCharts(prev => ({
+        ...prev,
+        [chartRequest]: true
+      }));
+    }
+  }
+
     // Get AI response
     const allMessages = [...messages, userMessage].map(m => ({
       role: m.role,
@@ -120,6 +174,7 @@ export function ChatContainer() {
     console.log('Month 360 (Year 30):', snapshots[359]);
 
     setChartData(snapshots);
+    setChartsReady(true); // Mark charts as ready (but don't show yet!)
     
     // Calculate monthly costs
     const buying = calculateBuyingCosts(inputs);
@@ -170,59 +225,66 @@ export function ChatContainer() {
           />
         ))}
         
-        {/* Show chart when we have data */}
-        {chartData && (
-          <div className="chart-wrapper">
-            <NetWorthChart data={chartData} />
-          </div>
+        {chartData && chartsReady && (
+          <>
+            {visibleCharts.netWorth && (
+              <div className="chart-wrapper">
+                <NetWorthChart data={chartData} />
+              </div>
+            )}
+  
+            {visibleCharts.monthlyCost && monthlyCosts && (
+              <div className="chart-wrapper">
+                <MonthlyCostChart 
+                  buyingCosts={monthlyCosts.buying}
+                  rentingCosts={monthlyCosts.renting}
+                />
+              </div>
+            )}
+  
+            {visibleCharts.totalCost && totalCostData && (
+              <div className="chart-wrapper">
+                <TotalCostChart 
+                  buyerFinalNetWorth={totalCostData.buyerFinalNetWorth}
+                  renterFinalNetWorth={totalCostData.renterFinalNetWorth}
+                  totalBuyingCosts={totalCostData.totalBuyingCosts}
+                  totalRentingCosts={totalCostData.totalRentingCosts}
+                  finalHomeValue={totalCostData.finalHomeValue}
+                  finalInvestmentValue={totalCostData.finalInvestmentValue}
+                />
+              </div>
+            )}
+  
+            {visibleCharts.equity && (
+              <div className="chart-wrapper">
+                <EquityBuildupChart data={chartData} />
+              </div>
+            )}
+  
+            {visibleCharts.rentGrowth && monthlyCosts && (
+              <div className="chart-wrapper">
+                <RentGrowthChart 
+                  data={chartData} 
+                  monthlyMortgage={monthlyCosts.buying.mortgage}
+                />
+              </div>
+            )}
+          </>
         )}
-
-        {chartData && (
-        <div className="chart-wrapper">
-            <EquityBuildupChart data={chartData} />
-        </div>
-        )}
-
-        {/* Chart 5: Rent Growth */}
-        {chartData && monthlyCosts && (
-        <div className="chart-wrapper">
-            <RentGrowthChart 
-            data={chartData} 
-            monthlyMortgage={monthlyCosts.buying.mortgage}
-            />
-        </div>
-        )}
-
-        {/* Show monthly cost breakdown */}
-        {monthlyCosts && (
-          <div className="chart-wrapper">
-            <MonthlyCostChart 
-              buyingCosts={monthlyCosts.buying}
-              rentingCosts={monthlyCosts.renting}
-            />
-          </div>
-        )}
-        
-        {/* Show total cost comparison */}
-        {totalCostData && (
-          <div className="chart-wrapper">
-            <TotalCostChart 
-              buyerFinalNetWorth={totalCostData.buyerFinalNetWorth}
-              renterFinalNetWorth={totalCostData.renterFinalNetWorth}
-              totalBuyingCosts={totalCostData.totalBuyingCosts}
-              totalRentingCosts={totalCostData.totalRentingCosts}
-              finalHomeValue={totalCostData.finalHomeValue}
-              finalInvestmentValue={totalCostData.finalInvestmentValue}
-            />
-          </div>
-        )}
-        
       </div>
       
       <ChatInput onSend={handleSendMessage} />
     </div>
   );
+  
+
 }
+
+
+
+
+
+
 
 // Extract numbers from user messages
 
