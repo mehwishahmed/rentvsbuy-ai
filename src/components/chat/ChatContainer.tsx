@@ -214,32 +214,81 @@ function isChartRequest(message: string): boolean {
           newUserData.downPaymentPercent !== userData.downPaymentPercent;
           
         if (dataChanged) {
-          console.log('⏳ Data changed, waiting for calculation to complete...');
-          // Wait for calculation to finish, then create the message
-          setTimeout(() => {
-            const assistantMessage: Message = {
-              id: (Date.now() + 1).toString(),
-              role: 'assistant',
-              content: `Here's the ${chartNames[chartRequest]}!`,
-              chartToShow: chartRequest as 'netWorth' | 'monthlyCost' | 'totalCost' | 'equity' | 'rentGrowth',
-              snapshotData: chartData && monthlyCosts && totalCostData && newUserData.homePrice && newUserData.monthlyRent && newUserData.downPaymentPercent ? {
-                chartData: chartData,
-                monthlyCosts: monthlyCosts,
-                totalCostData: totalCostData,
-                inputValues: {
-                  homePrice: newUserData.homePrice,
-                  monthlyRent: newUserData.monthlyRent,
-                  downPaymentPercent: newUserData.downPaymentPercent
-                }
-              } : undefined
-            };
-            
-            setMessages(prev => [...prev, assistantMessage]);
-            setVisibleCharts(prev => ({
-              ...prev,
-              [chartRequest]: true
-            }));
-          }, 200);
+          console.log('⏳ Data changed, calculating chart data with new values...');
+          // Calculate the chart data immediately with the new values
+          const inputs: ScenarioInputs = {
+            homePrice: newUserData.homePrice!,
+            monthlyRent: newUserData.monthlyRent!,
+            downPaymentPercent: newUserData.downPaymentPercent!,
+            interestRate: 6.5,
+            loanTermYears: 30,
+            propertyTaxRate: 1.2,
+            homeInsuranceAnnual: 1200,
+            hoaMonthly: 0,
+            maintenanceRate: 1.0,
+            renterInsuranceAnnual: 240,
+            homeAppreciationRate: 3.0,
+            rentGrowthRate: 3.5,
+            investmentReturnRate: 7.0
+          };
+          
+          // Calculate net worth comparison with NEW data
+          const newSnapshots = calculateNetWorthComparison(inputs);
+          
+          // Calculate monthly costs with NEW data
+          const newBuying = calculateBuyingCosts(inputs);
+          const newRenting = calculateRentingCosts(inputs, 1);
+          const newMonthlyCosts = {
+            buying: {
+              mortgage: newBuying.mortgage,
+              propertyTax: newBuying.propertyTax,
+              insurance: newBuying.insurance,
+              hoa: newBuying.hoa,
+              maintenance: newBuying.maintenance,
+              total: newBuying.total
+            },
+            renting: {
+              rent: newRenting.monthlyRent,
+              insurance: newRenting.insurance,
+              total: newRenting.total
+            }
+          };
+          
+          // Calculate total costs with NEW data
+          const month360 = newSnapshots[359];
+          const newTotalBuyingCosts = newSnapshots.reduce((sum, s) => sum + s.monthlyBuyingCosts, 0);
+          const newTotalRentingCosts = newSnapshots.reduce((sum, s) => sum + s.monthlyRentingCosts, 0);
+          const newTotalCostData = {
+            buyerFinalNetWorth: month360.buyerNetWorth,
+            renterFinalNetWorth: month360.renterNetWorth,
+            totalBuyingCosts: newTotalBuyingCosts,
+            totalRentingCosts: newTotalRentingCosts,
+            finalHomeValue: month360.homeValue,
+            finalInvestmentValue: month360.investedDownPayment
+          };
+          
+          const assistantMessage: Message = {
+            id: (Date.now() + 1).toString(),
+            role: 'assistant',
+            content: `Here's the ${chartNames[chartRequest]}!`,
+            chartToShow: chartRequest as 'netWorth' | 'monthlyCost' | 'totalCost' | 'equity' | 'rentGrowth',
+            snapshotData: {
+              chartData: newSnapshots,
+              monthlyCosts: newMonthlyCosts,
+              totalCostData: newTotalCostData,
+              inputValues: {
+                homePrice: newUserData.homePrice!,
+                monthlyRent: newUserData.monthlyRent!,
+                downPaymentPercent: newUserData.downPaymentPercent!
+              }
+            }
+          };
+          
+          setMessages(prev => [...prev, assistantMessage]);
+          setVisibleCharts(prev => ({
+            ...prev,
+            [chartRequest]: true
+          }));
         } else {
           // No data change, create message immediately
           const assistantMessage: Message = {
