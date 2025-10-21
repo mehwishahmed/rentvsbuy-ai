@@ -1169,15 +1169,18 @@ function extractUserData(message: string, currentData: UserData): { userData: Us
   const newData = { ...currentData };
   const lowerMessage = message.toLowerCase();
   
-  // Check for ZIP code
+  // Check for ZIP code FIRST and remove it from the message for number extraction
   const zipCode = detectZipCode(message);
   let locationData: FormattedLocationData | null = null;
+  let messageWithoutZip = message;
   
   if (zipCode) {
     const rawLocationData = getLocationData(zipCode);
     if (rawLocationData) {
       locationData = formatLocationData(rawLocationData);
     }
+    // Remove the ZIP code from message so it doesn't get extracted as a home price
+    messageWithoutZip = message.replace(new RegExp(`\\b${zipCode}\\b`, 'g'), '');
   }
   
   // Check if user is providing NEW values (overwrite mode)
@@ -1219,7 +1222,7 @@ function extractUserData(message: string, currentData: UserData): { userData: Us
     return numbers;
   };
   
-  const allNumbers = extractAllNumbers(message);
+  const allNumbers = extractAllNumbers(messageWithoutZip);
   
   // If only one number, use context clues
   if (allNumbers.length === 1) {
