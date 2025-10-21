@@ -883,6 +883,10 @@ Restart
                 <h3>💡 The Bottom Line</h3>
                 <span className="insights-subtitle">Based on 30-year projection</span>
               </div>
+              
+              <div className="insights-description">
+                <p>Want quick numbers? Here are the key stats based on your scenario:</p>
+              </div>
               <div className="risk-badge-container">
                 <span className={`risk-badge risk-${insights.risk.toLowerCase()}`}>{insights.risk} Risk</span>
               </div>
