@@ -532,13 +532,16 @@ const handleChipClick = (message: string) => {
 };
 
   const calculateAndShowChart = (data: UserData) => {
+    // Use local property tax rate if available, otherwise default to 1.0%
+    const propertyTaxRate = locationData?.propertyTaxRate || 1.0;
+    
     const inputs: ScenarioInputs = {
       homePrice: data.homePrice!,
       downPaymentPercent: data.downPaymentPercent!,
       monthlyRent: data.monthlyRent!,
       interestRate: 7.0,
       loanTermYears: 30,
-      propertyTaxRate: 1.0,
+      propertyTaxRate: propertyTaxRate,
       homeInsuranceAnnual: 1200,
       hoaMonthly: 150,
       maintenanceRate: 1.0,
