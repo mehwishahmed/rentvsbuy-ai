@@ -436,6 +436,20 @@ function shouldShowChart(aiResponse: string): string | null {
     // Extract data from message
     const { userData: newUserData, locationData: detectedLocationData } = extractUserData(content, userData);
     
+    // Check if user mentioned a ZIP code but it wasn't found
+    const zipCode = detectZipCode(content);
+    if (zipCode && !detectedLocationData) {
+      // Invalid/not found ZIP code
+      const invalidZipMessage: Message = {
+        id: Date.now().toString(),
+        role: 'assistant',
+        content: `I couldn't find data for ZIP code ${zipCode}. If you'd like, we can continue with your own numbers using standard assumptions (1.0% property tax, 3.5% rent growth). What home price and monthly rent are you working with?`
+      };
+      setMessages(prev => [...prev, invalidZipMessage]);
+      setIsLoading(false);
+      return;
+    }
+    
     // Handle location data if detected
     if (detectedLocationData) {
       setLocationData(detectedLocationData);
@@ -546,8 +560,8 @@ function shouldShowChart(aiResponse: string): string | null {
     if (chartToShow && (chartsReady || hasAllData) && freshChartData && freshMonthlyCosts && freshTotalCostData) {
       // AI wants to show a chart and we have the data
       assistantMessage = {
-        id: (Date.now() + 1).toString(),
-        role: 'assistant',
+      id: (Date.now() + 1).toString(),
+      role: 'assistant',
         content: botResponse,
         chartToShow: chartToShow as 'netWorth' | 'monthlyCost' | 'totalCost' | 'equity' | 'rentGrowth',
         snapshotData: {
@@ -563,8 +577,8 @@ function shouldShowChart(aiResponse: string): string | null {
       };
       
       // Mark this chart as visible
-      setVisibleCharts(prev => ({
-        ...prev,
+    setVisibleCharts(prev => ({
+      ...prev,
         [chartToShow]: true
       }));
       
@@ -717,7 +731,7 @@ const handleChipClick = (message: string) => {
     
     switch (chartType) {
       case 'netWorth':
-        return (
+  return (
           <div className="chart-wrapper">
             {ValuesBox}
             <NetWorthChart data={data} />
@@ -1034,7 +1048,7 @@ Restart
 
         {/* Scroll target for smooth scrolling to charts */}
         <div ref={messagesEndRef} />
-      </div>
+              </div>
       
       {/* Chart Navigation Buttons - above input for convenience */}
       {chartsReady && (
@@ -1087,7 +1101,7 @@ Restart
           <span>RentVsBuy.ai v1.0</span>
           <span>•</span>
           <span>Built with AI-powered insights</span>
-        </div>
+              </div>
       </div>
       
       {/* Restart Confirmation Modal */}
@@ -1167,8 +1181,8 @@ Restart
               <div className="insights-header">
                 <h3>💡 The Bottom Line</h3>
                 <span className="insights-subtitle">Based on 30-year projection</span>
-              </div>
-              
+      </div>
+      
               <div className="insights-description">
                 <p>Want quick numbers? Here are the key stats based on your scenario:</p>
               </div>
