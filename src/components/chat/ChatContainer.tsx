@@ -466,6 +466,7 @@ function shouldShowChart(aiResponse: string): string | null {
       
       // Show hint for bottom line button after viewing a chart
       setTimeout(() => {
+        console.log('Showing bottom line hint from AI response');
         setShowBottomLineHint(true);
         // Hide hint after 5 seconds
         setTimeout(() => setShowBottomLineHint(false), 5000);
@@ -503,13 +504,19 @@ function shouldShowChart(aiResponse: string): string | null {
       calculateAndShowChart(newUserData);
     }
   };
-  
-  // Handle suggestion chip clicks
 
 // Handle suggestion chip clicks
 const handleChipClick = (message: string) => {
-  // Handle chip click as a normal message - let AI handle everything
-  handleSendMessage(message);
+    // Handle chip click as a normal message - let AI handle everything
+    handleSendMessage(message);
+    
+    // Show hint for bottom line button after clicking chart buttons
+    setTimeout(() => {
+      console.log('Showing bottom line hint');
+      setShowBottomLineHint(true);
+      // Hide hint after 5 seconds
+      setTimeout(() => setShowBottomLineHint(false), 5000);
+    }, 2000);
 };
 
   const calculateAndShowChart = (data: UserData) => {
@@ -767,7 +774,7 @@ Restart
             visibleCharts={visibleCharts}
           />
         )}
-        
+
         {/* Scroll target for smooth scrolling to charts */}
         <div ref={messagesEndRef} />
       </div>
