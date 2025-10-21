@@ -724,11 +724,8 @@ body {
   transform: translateY(0);
 }
 
-/* Floating "Bottom Line?" Button - Spotlight effect */
+/* Floating "Bottom Line?" Button - Subtle spotlight */
 .bottom-line-trigger {
-  position: fixed;
-  bottom: 20px;
-  right: 20px;
   background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
   color: white;
   border: none;
@@ -737,12 +734,55 @@ body {
   font-size: 15px;
   font-weight: 700;
   cursor: pointer;
-  box-shadow: 0 8px 25px rgba(245, 87, 108, 0.6);
+  box-shadow: 0 8px 25px rgba(245, 87, 108, 0.6), 0 0 20px rgba(245, 87, 108, 0.3);
   transition: all 0.3s ease;
-  z-index: 1000;
-  animation: spotlightPulse 2s infinite;
   border: 3px solid rgba(255, 255, 255, 0.5);
-  transform: scale(1.1);
+  position: relative;
+}
+
+/* Container for button and arrow */
+.bottom-line-container {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 1000;
+}
+
+/* Spotlight effect around the button */
+.bottom-line-trigger::before {
+  content: '';
+  position: absolute;
+  top: -10px;
+  left: -10px;
+  right: -10px;
+  bottom: -10px;
+  background: radial-gradient(circle, rgba(245, 87, 108, 0.2) 0%, transparent 70%);
+  border-radius: 35px;
+  z-index: -1;
+  animation: spotlightGlow 3s ease-in-out infinite;
+}
+
+/* Arrow pointing to button */
+.bottom-line-arrow {
+  position: absolute;
+  bottom: 60px;
+  right: -20px;
+  z-index: 999;
+}
+
+.arrow-line {
+  width: 2px;
+  height: 30px;
+  background: linear-gradient(to top, #f5576c, transparent);
+  margin-left: 10px;
+}
+
+.arrow-head {
+  font-size: 20px;
+  color: #f5576c;
+  font-weight: bold;
+  margin-left: 2px;
+  animation: arrowPulse 2s ease-in-out infinite;
 }
 
 .bottom-line-trigger:hover {
@@ -751,14 +791,25 @@ body {
   animation: none;
 }
 
-@keyframes spotlightPulse {
+@keyframes spotlightGlow {
   0%, 100% {
-    box-shadow: 0 8px 25px rgba(245, 87, 108, 0.6), 0 0 20px rgba(245, 87, 108, 0.4);
-    transform: scale(1.1);
+    opacity: 0.3;
+    transform: scale(1);
   }
   50% {
-    box-shadow: 0 12px 35px rgba(245, 87, 108, 0.8), 0 0 30px rgba(245, 87, 108, 0.6);
-    transform: scale(1.15);
+    opacity: 0.6;
+    transform: scale(1.05);
+  }
+}
+
+@keyframes arrowPulse {
+  0%, 100% {
+    opacity: 0.7;
+    transform: translateX(0);
+  }
+  50% {
+    opacity: 1;
+    transform: translateX(3px);
   }
 }
 

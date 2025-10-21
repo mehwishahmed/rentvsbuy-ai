@@ -650,13 +650,21 @@ const handleChipClick = (message: string) => {
     <div className="app-layout">
       {/* Floating "Bottom Line?" Button - only show when charts are ready */}
       {chartsReady && insights && (
-        <button 
-          className="bottom-line-trigger"
-          onClick={() => setShowInsightsModal(true)}
-          title="See the bottom line summary"
-        >
-          💡 Bottom Line?
-        </button>
+        <div className="bottom-line-container">
+          {/* Arrow pointing to button */}
+          <div className="bottom-line-arrow">
+            <div className="arrow-line"></div>
+            <div className="arrow-head">→</div>
+          </div>
+          
+          <button 
+            className="bottom-line-trigger"
+            onClick={() => setShowInsightsModal(true)}
+            title="See the bottom line summary"
+          >
+            💡 Bottom Line?
+          </button>
+        </div>
       )}
       
     <div className="chat-container">
