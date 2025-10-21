@@ -345,6 +345,9 @@ const [chartsReady, setChartsReady] = useState(false);
       setUsingZipData(false);
       setShowLocationCard(false); // Hide the decision card
       
+      // Clear location data so reference box uses custom values, not ZIP data
+      setLocationData(null);
+      
       // Add AI message referencing the box
       const aiMessage: Message = {
         id: Date.now().toString(),
