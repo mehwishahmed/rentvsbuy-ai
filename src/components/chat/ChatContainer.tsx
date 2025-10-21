@@ -453,6 +453,25 @@ function shouldShowChart(aiResponse: string): string | null {
     // Handle location data if detected
     if (detectedLocationData) {
       setLocationData(detectedLocationData);
+      
+      // Check if user also provided custom values in the same message
+      const hasCustomValues = newUserData.homePrice || newUserData.monthlyRent || newUserData.downPaymentPercent;
+      
+      if (hasCustomValues) {
+        // PATH 10: ZIP + custom data conflict
+        // Show card with custom message explaining both options
+        setShowLocationCard(true);
+        const conflictMessage: Message = {
+          id: Date.now().toString(),
+          role: 'assistant',
+          content: `I see you mentioned ${detectedLocationData.city}, ${detectedLocationData.state} (${zipCode}). Here's the current data for that area. Would you like to use these values instead, or should we continue with the numbers you provided${newUserData.homePrice ? ` ($${(newUserData.homePrice / 1000).toFixed(0)}k` : ''}${newUserData.monthlyRent ? `, $${(newUserData.monthlyRent / 1000).toFixed(1)}k` : ''}${newUserData.downPaymentPercent ? `, ${newUserData.downPaymentPercent}%` : ''})?`
+        };
+        setMessages(prev => [...prev, conflictMessage]);
+        setIsLoading(false);
+        return; // Wait for user choice
+      }
+      
+      // Normal ZIP flow (no custom data provided)
       setShowLocationCard(true);
       // Reset lock if user is trying a new ZIP code
       if (isLocationLocked) {
