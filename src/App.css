@@ -946,8 +946,9 @@ body {
 }
 
 .insights-modal .insights-description p {
-  color: #2d3748;
-  font-size: 14px;
+  color: #667eea;
+  font-size: 15px;
+  font-weight: 600;
   margin: 0;
   line-height: 1.4;
 }
