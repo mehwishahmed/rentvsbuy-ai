@@ -376,10 +376,11 @@ function shouldShowChart(aiResponse: string): string | null {
       const lowerContent = content.toLowerCase();
       
       // Detect "use local data" intent
-      if ((lowerContent.includes('use') && (lowerContent.includes('those') || lowerContent.includes('local') || lowerContent.includes('zip') || lowerContent.includes('that'))) ||
+      if ((lowerContent.includes('use') && (lowerContent.includes('those') || lowerContent.includes('local') || lowerContent.includes('zip') || lowerContent.includes('that') || lowerContent.includes('data'))) ||
           lowerContent.includes('use those') ||
           lowerContent.includes('use local') ||
           lowerContent.includes('use that data') ||
+          lowerContent.includes('use the data') ||
           lowerContent === 'yes' || lowerContent === 'yeah' || lowerContent === 'sure') {
         // Add user message first
         const userMessage: Message = {
