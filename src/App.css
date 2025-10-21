@@ -724,7 +724,7 @@ body {
   transform: translateY(0);
 }
 
-/* Floating "Bottom Line?" Button - Attention-grabbing */
+/* Floating "Bottom Line?" Button - Spotlight effect */
 .bottom-line-trigger {
   position: fixed;
   bottom: 20px;
@@ -732,16 +732,17 @@ body {
   background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
   color: white;
   border: none;
-  padding: 10px 18px;
+  padding: 12px 20px;
   border-radius: 25px;
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 700;
   cursor: pointer;
-  box-shadow: 0 6px 20px rgba(245, 87, 108, 0.4);
+  box-shadow: 0 8px 25px rgba(245, 87, 108, 0.6);
   transition: all 0.3s ease;
   z-index: 1000;
-  animation: attentionPulse 3s infinite;
-  border: 2px solid rgba(255, 255, 255, 0.3);
+  animation: spotlightPulse 2s infinite;
+  border: 3px solid rgba(255, 255, 255, 0.5);
+  transform: scale(1.1);
 }
 
 .bottom-line-trigger:hover {
@@ -750,14 +751,14 @@ body {
   animation: none;
 }
 
-@keyframes attentionPulse {
+@keyframes spotlightPulse {
   0%, 100% {
-    box-shadow: 0 6px 20px rgba(245, 87, 108, 0.4);
-    transform: scale(1);
+    box-shadow: 0 8px 25px rgba(245, 87, 108, 0.6), 0 0 20px rgba(245, 87, 108, 0.4);
+    transform: scale(1.1);
   }
   50% {
-    box-shadow: 0 8px 30px rgba(245, 87, 108, 0.7);
-    transform: scale(1.02);
+    box-shadow: 0 12px 35px rgba(245, 87, 108, 0.8), 0 0 30px rgba(245, 87, 108, 0.6);
+    transform: scale(1.15);
   }
 }
 

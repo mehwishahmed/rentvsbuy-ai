@@ -87,8 +87,6 @@ const [chartsReady, setChartsReady] = useState(false);
   // Ref for scrolling to charts
   const messagesEndRef = useRef<HTMLDivElement>(null);
   
-  // Show hint for bottom line button after user has viewed a chart
-  const [showBottomLineHint, setShowBottomLineHint] = useState(false);
   const [monthlyCosts, setMonthlyCosts] = useState<{
     buying: any;
     renting: any;
@@ -464,13 +462,6 @@ function shouldShowChart(aiResponse: string): string | null {
         });
       }, 300);
       
-      // Show hint for bottom line button after viewing a chart
-      setTimeout(() => {
-        console.log('Showing bottom line hint from AI response');
-        setShowBottomLineHint(true);
-        // Hide hint after 8 seconds (longer duration)
-        setTimeout(() => setShowBottomLineHint(false), 8000);
-      }, 1500);
     } else {
       // Normal AI response without chart
       assistantMessage = {
@@ -510,13 +501,6 @@ const handleChipClick = (message: string) => {
     // Handle chip click as a normal message - let AI handle everything
     handleSendMessage(message);
     
-    // Show hint for bottom line button after clicking chart buttons
-    setTimeout(() => {
-      console.log('Showing bottom line hint');
-      setShowBottomLineHint(true);
-      // Hide hint after 8 seconds (longer duration)
-      setTimeout(() => setShowBottomLineHint(false), 8000);
-    }, 1500);
 };
 
   const calculateAndShowChart = (data: UserData) => {
@@ -666,25 +650,13 @@ const handleChipClick = (message: string) => {
     <div className="app-layout">
       {/* Floating "Bottom Line?" Button - only show when charts are ready */}
       {chartsReady && insights && (
-        <div style={{ position: 'relative' }}>
-          <button 
-            className="bottom-line-trigger"
-            onClick={() => setShowInsightsModal(true)}
-            title="See the bottom line summary"
-          >
-            💡 Bottom Line?
-          </button>
-          
-          {/* Hint tooltip */}
-          {showBottomLineHint && (
-            <div className="bottom-line-hint">
-              <div className="hint-arrow"></div>
-              <div className="hint-text">
-                Click here for a quick summary!
-              </div>
-            </div>
-          )}
-        </div>
+        <button 
+          className="bottom-line-trigger"
+          onClick={() => setShowInsightsModal(true)}
+          title="See the bottom line summary"
+        >
+          💡 Bottom Line?
+        </button>
       )}
       
     <div className="chat-container">
