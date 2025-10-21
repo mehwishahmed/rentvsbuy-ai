@@ -1,6 +1,6 @@
 // src/components/chat/ChatContainer.tsx
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { ChatMessage } from './ChatMessage';
 import { ChatInput } from './ChatInput';
 import { NetWorthChart } from '../charts/NetWorthChart';
@@ -83,6 +83,9 @@ const [chartsReady, setChartsReady] = useState(false);
   
   // Restart modal state
   const [showRestartModal, setShowRestartModal] = useState(false);
+  
+  // Ref for scrolling to charts
+  const messagesEndRef = useRef<HTMLDivElement>(null);
   const [monthlyCosts, setMonthlyCosts] = useState<{
     buying: any;
     renting: any;
@@ -449,6 +452,14 @@ function shouldShowChart(aiResponse: string): string | null {
         ...prev,
         [chartToShow]: true
       }));
+      
+      // Smooth scroll to the new chart after a brief delay
+      setTimeout(() => {
+        messagesEndRef.current?.scrollIntoView({ 
+          behavior: 'smooth',
+          block: 'end'
+        });
+      }, 300);
     } else {
       // Normal AI response without chart
       assistantMessage = {
@@ -668,7 +679,7 @@ Restart
           </div>
       </div>
       
-      <div className="messages-container">
+      <div className="messages-container" ref={messagesEndRef}>
         {messages.map(message => (
           <div key={message.id} data-message-id={message.id}>
             {/* Render confirmation card for system messages */}
@@ -734,6 +745,9 @@ Restart
             visibleCharts={visibleCharts}
           />
         )}
+        
+        {/* Scroll target for smooth scrolling to charts */}
+        <div ref={messagesEndRef} />
       </div>
       
       {/* Chart Navigation Buttons - above input for convenience */}
