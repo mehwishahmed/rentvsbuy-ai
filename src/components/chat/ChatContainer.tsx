@@ -77,6 +77,7 @@ export function ChatContainer() {
 
 // Track if charts are ready to show (data calculated)
 const [chartsReady, setChartsReady] = useState(false);
+  const [hasViewedChart, setHasViewedChart] = useState(false); // Track if user has viewed at least one chart
   const [isLoading, setIsLoading] = useState(false);
   const [saveProgress, setSaveProgress] = useState<number | null>(null); // Track PDF save progress
   
@@ -293,6 +294,7 @@ const [chartsReady, setChartsReady] = useState(false);
       rentGrowth: false
     });
     setChartsReady(false);
+    setHasViewedChart(false);
     setMonthlyCosts(null);
     setTotalCostData(null);
     setShowRestartModal(false);
@@ -447,6 +449,9 @@ function shouldShowChart(aiResponse: string): string | null {
         ...prev,
         [chartToShow]: true
       }));
+      
+      // User has now viewed a chart - show sidebar
+      setHasViewedChart(true);
     } else {
       // Normal AI response without chart
       assistantMessage = {
@@ -634,23 +639,26 @@ const handleChipClick = (message: string) => {
   
   return (
     <div className="app-layout">
-      {/* Insights Sidebar */}
-      {insights && (
+      {/* Insights Sidebar - only show after user views first chart */}
+      {insights && hasViewedChart && (
         <div className="insights-sidebar">
           <div className="insights-summary">
             <div className="insights-header">
-              <h3>📊 Bottom Line</h3>
+              <h3>📊 Quick Summary</h3>
+              <span className="insights-subtitle">Based on 30-year projection</span>
+            </div>
+            <div className="risk-badge-container">
               <span className={`risk-badge risk-${insights.risk.toLowerCase()}`}>{insights.risk} Risk</span>
             </div>
             
             <div className="insights-grid">
               <div className="insight-card primary">
-                <div className="insight-label">Recommendation</div>
+                <div className="insight-label">30-Year Outcome</div>
                 <div className="insight-value winner">
-                  {insights.winner === 'buying' ? '🏠 Buying Wins' : '🏘️ Renting Wins'}
+                  {insights.winner === 'buying' ? '🏠 Buying' : '🏘️ Renting'}
                 </div>
                 <div className="insight-detail">
-                  Save ${(insights.savings / 1000).toFixed(0)}k over 30 years
+                  Ahead by ${(insights.savings / 1000).toFixed(0)}k
                 </div>
               </div>
               
