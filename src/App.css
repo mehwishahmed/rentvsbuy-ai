@@ -811,6 +811,58 @@ body {
   margin-top: 8px;
 }
 
+/* Modal-specific text colors (white background) */
+.insights-modal .insight-card {
+  background: #f8f9fa;
+  border: 1px solid #e9ecef;
+  color: #2d3748;
+}
+
+.insights-modal .insight-card.primary {
+  background: #e3f2fd;
+  border: 2px solid #2196f3;
+}
+
+.insights-modal .insight-label {
+  color: #6c757d;
+  font-size: 11px;
+  font-weight: 600;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.insights-modal .insight-value {
+  color: #2d3748;
+  font-size: 26px;
+  font-weight: 700;
+  margin-bottom: 6px;
+  line-height: 1.2;
+}
+
+.insights-modal .insight-value.winner {
+  font-size: 28px;
+  color: #2196f3;
+}
+
+.insights-modal .insight-detail {
+  color: #6c757d;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.insights-modal .insights-header h3 {
+  color: #2d3748;
+}
+
+.insights-modal .insights-subtitle {
+  color: #6c757d;
+}
+
+.insights-modal .risk-badge {
+  color: white;
+}
+
 /* Confirmation Card Styles */
 .confirmation-card {
   background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);

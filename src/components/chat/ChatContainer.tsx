@@ -850,7 +850,7 @@ Restart
               </div>
               </div>
             )}
-            
+  
       {/* Bottom Line Insights Modal */}
       {showInsightsModal && insights && (
         <div className="modal-overlay" onClick={() => setShowInsightsModal(false)}>
@@ -893,8 +893,8 @@ Restart
                       ? 'Buying costs more monthly' 
                       : 'Renting costs more monthly'}
                   </div>
-                </div>
-                
+      </div>
+      
                 <div className="insight-card">
                   <div className="insight-label">Break-Even Point</div>
                   <div className="insight-value">Year {insights.breakEvenYear}</div>
