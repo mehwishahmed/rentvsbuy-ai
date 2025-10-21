@@ -416,6 +416,11 @@ function shouldShowChart(aiResponse: string): string | null {
     if (detectedLocationData) {
       setLocationData(detectedLocationData);
       setShowLocationCard(true);
+      // Reset lock if user is trying a new ZIP code
+      if (isLocationLocked) {
+        setIsLocationLocked(false);
+        setUsingZipData(false);
+      }
     }
     setUserData(newUserData);
     
