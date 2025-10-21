@@ -772,22 +772,30 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
+  padding: 8px;
+  border-radius: 20px;
+  background: rgba(245, 87, 108, 0.1);
+  animation: arrowContainerPulse 2s ease-in-out infinite;
 }
 
 .arrow-line {
-  width: 2px;
-  height: 25px;
+  width: 4px;
+  height: 35px;
   background: linear-gradient(to bottom, transparent, #f5576c);
+  border-radius: 2px;
+  box-shadow: 0 0 10px rgba(245, 87, 108, 0.5);
 }
 
 .arrow-head {
-  font-size: 24px;
+  font-size: 32px;
   color: #f5576c;
-  font-weight: bold;
+  font-weight: 900;
   line-height: 1;
-  animation: arrowPulse 2s ease-in-out infinite;
-  margin-top: -5px;
+  animation: arrowPulse 1.5s ease-in-out infinite;
+  margin-top: -8px;
   transform: rotate(90deg);
+  text-shadow: 0 0 8px rgba(245, 87, 108, 0.8);
+  filter: drop-shadow(0 0 4px rgba(245, 87, 108, 0.6));
 }
 
 .bottom-line-trigger:hover {
@@ -809,12 +817,23 @@ body {
 
 @keyframes arrowPulse {
   0%, 100% {
-    opacity: 0.7;
-    transform: rotate(90deg) translateX(0);
+    opacity: 0.8;
+    transform: rotate(90deg) translateX(0) scale(1);
   }
   50% {
     opacity: 1;
-    transform: rotate(90deg) translateX(3px);
+    transform: rotate(90deg) translateX(5px) scale(1.2);
+  }
+}
+
+@keyframes arrowContainerPulse {
+  0%, 100% {
+    background: rgba(245, 87, 108, 0.1);
+    transform: translateX(-50%) scale(1);
+  }
+  50% {
+    background: rgba(245, 87, 108, 0.2);
+    transform: translateX(-50%) scale(1.05);
   }
 }
 
