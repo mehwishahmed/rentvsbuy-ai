@@ -22,40 +22,20 @@ interface Suggestion {
 }
 
 export function SuggestionChips({ onChipClick, visibleCharts }: SuggestionChipsProps) {
-  // All possible suggestions
+  // All possible suggestions - only general questions now (charts have dedicated buttons)
   const allSuggestions: Suggestion[] = [
-    // Chart suggestions
     {
-      id: 'netWorth',
-      text: '📊 Show net worth comparison',
-      message: 'Show me the net worth comparison',
-      type: 'chart'
+      id: 'advice',
+      text: '💡 Should I buy in my situation?',
+      message: 'Should I buy or rent in my situation?',
+      type: 'general'
     },
     {
-      id: 'monthlyCost',
-      text: '💰 Monthly costs breakdown',
-      message: 'What are the monthly costs?',
-      type: 'chart'
+      id: 'breakEven',
+      text: '⏰ When does buying pay off?',
+      message: 'When does buying become worth it?',
+      type: 'general'
     },
-    {
-      id: 'totalCost',
-      text: '🏆 Which option wins?',
-      message: 'Show me the total cost comparison',
-      type: 'chart'
-    },
-    {
-      id: 'equity',
-      text: '🏠 Home equity buildup',
-      message: 'Show me the equity buildup',
-      type: 'chart'
-    },
-    {
-      id: 'rentGrowth',
-      text: '📈 Rent vs mortgage growth',
-      message: 'How does rent grow compared to mortgage?',
-      type: 'chart'
-    },
-    // General questions
     {
       id: 'shortTerm',
       text: '🤔 What if I only stay 10 years?',
@@ -81,35 +61,33 @@ export function SuggestionChips({ onChipClick, visibleCharts }: SuggestionChipsP
       type: 'general'
     },
     {
-      id: 'advice',
-      text: '📊 Should I buy in my situation?',
-      message: 'Should I buy or rent in my situation?',
-      type: 'general'
-    },
-    {
-      id: 'breakEven',
-      text: '⏰ When does buying pay off?',
-      message: 'When does buying become worth it?',
-      type: 'general'
-    },
-    {
       id: 'rentIncrease',
       text: '🔄 What if rent increases faster?',
       message: 'What if rent increases faster than expected?',
       type: 'general'
+    },
+    {
+      id: 'maintenance',
+      text: '🔧 What about maintenance costs?',
+      message: 'What about ongoing maintenance costs?',
+      type: 'general'
+    },
+    {
+      id: 'flexibility',
+      text: '🚚 How does flexibility factor in?',
+      message: 'How important is flexibility in this decision?',
+      type: 'general'
+    },
+    {
+      id: 'investment',
+      text: '📈 Could I invest the down payment instead?',
+      message: 'What if I invested the down payment instead of buying?',
+      type: 'general'
     }
   ];
 
-  // Filter out chart suggestions that are already visible
-  const availableSuggestions = allSuggestions.filter(s => {
-    if (s.type === 'general') return true;
-    if (s.id === 'netWorth') return !visibleCharts.netWorth;
-    if (s.id === 'monthlyCost') return !visibleCharts.monthlyCost;
-    if (s.id === 'totalCost') return !visibleCharts.totalCost;
-    if (s.id === 'equity') return !visibleCharts.equity;
-    if (s.id === 'rentGrowth') return !visibleCharts.rentGrowth;
-    return true;
-  });
+  // All suggestions are available (no chart filtering needed)
+  const availableSuggestions = allSuggestions;
 
   // State for currently displayed chips (always show 2)
   const [displayedChips, setDisplayedChips] = useState<Suggestion[]>([]);
