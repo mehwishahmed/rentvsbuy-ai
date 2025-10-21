@@ -378,6 +378,47 @@ function shouldShowChart(aiResponse: string): string | null {
 }
 
   const handleSendMessage = async (content: string) => {
+    // PATH 14: Check if user is changing their mind after making a choice
+    if (isLocationLocked && locationData) {
+      const lowerContent = content.toLowerCase();
+      
+      // User chose ZIP data but now wants custom
+      if (usingZipData && ((lowerContent.includes('actually') || lowerContent.includes('wait')) && (lowerContent.includes('my own') || lowerContent.includes('custom') || lowerContent.includes('enter')))) {
+        // Reset to custom mode
+        setIsLocationLocked(false);
+        setUsingZipData(false);
+        setLocationData(null);
+        setUserData({ homePrice: null, monthlyRent: null, downPaymentPercent: null });
+        
+        const changeMessage: Message = {
+          id: Date.now().toString(),
+          role: 'assistant',
+          content: "No problem! Let's go with your own numbers instead. What home price and monthly rent are you working with?"
+        };
+        setMessages(prev => [...prev, { id: Date.now().toString(), role: 'user', content }, changeMessage]);
+        return;
+      }
+      
+      // User chose custom but now wants ZIP data
+      if (!usingZipData && ((lowerContent.includes('actually') || lowerContent.includes('wait')) && (lowerContent.includes('zip') || lowerContent.includes('local') || lowerContent.includes('those values')))) {
+        // Switch to ZIP mode
+        setUsingZipData(true);
+        setUserData({
+          homePrice: locationData.medianHomePrice,
+          monthlyRent: locationData.averageRent,
+          downPaymentPercent: null
+        });
+        
+        const changeMessage: Message = {
+          id: Date.now().toString(),
+          role: 'assistant',
+          content: `Sure thing! I'll use the ${locationData.city}, ${locationData.state} data. Just need your down payment percentage.`
+        };
+        setMessages(prev => [...prev, { id: Date.now().toString(), role: 'user', content }, changeMessage]);
+        return;
+      }
+    }
+    
     // Check if user is responding to ZIP code choice via text
     if (showLocationCard && locationData && !isLocationLocked) {
       const lowerContent = content.toLowerCase();
