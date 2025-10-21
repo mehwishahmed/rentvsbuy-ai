@@ -88,6 +88,8 @@ const [chartsReady, setChartsReady] = useState(false);
   // Location data state
   const [locationData, setLocationData] = useState<FormattedLocationData | null>(null);
   const [showLocationCard, setShowLocationCard] = useState(false);
+  const [isLocationLocked, setIsLocationLocked] = useState(false); // Track if user made a choice
+  const [usingZipData, setUsingZipData] = useState(false); // Track which scenario
   
   // Ref for scrolling to charts
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -309,6 +311,8 @@ const [chartsReady, setChartsReady] = useState(false);
     setShowRestartModal(false);
     setLocationData(null);
     setShowLocationCard(false);
+    setIsLocationLocked(false);
+    setUsingZipData(false);
   };
 
   const handleUseLocalData = () => {
@@ -320,7 +324,9 @@ const [chartsReady, setChartsReady] = useState(false);
       };
       setUserData(newUserData);
       
-      // Keep card visible for reference (already handled by not calling setShowLocationCard(false))
+      // Lock the card in reference mode
+      setIsLocationLocked(true);
+      setUsingZipData(true);
       
       // Add AI message asking for down payment
       const aiMessage: Message = {
@@ -334,8 +340,10 @@ const [chartsReady, setChartsReady] = useState(false);
 
   const handleKeepMyData = () => {
     if (locationData) {
-      // Hide the location card
-      setShowLocationCard(false);
+      // Lock the card in reference mode (will show user's custom values once provided)
+      setIsLocationLocked(true);
+      setUsingZipData(false);
+      setShowLocationCard(false); // Hide for now, will reappear once user provides data
       
       // Add AI message with preset assumptions and ask for their numbers
       const aiMessage: Message = {
@@ -541,6 +549,11 @@ function shouldShowChart(aiResponse: string): string | null {
         })
       };
       setMessages(prev => [...prev, confirmationCard]);
+      
+      // Show reference box if user chose to keep their own data
+      if (isLocationLocked && !usingZipData) {
+        setShowLocationCard(true);
+      }
     }
     
     // Then add bot response (so it appears AFTER the card)
@@ -720,7 +733,8 @@ const handleChipClick = (message: string) => {
       )}
       
       {/* Location Data Card */}
-      {showLocationCard && locationData && (
+      {showLocationCard && locationData && !isLocationLocked && (
+        // Decision Mode: Show big card with buttons
         <div className="location-data-card">
           <div className="location-card-header">
             <h3>📍 {locationData.city}, {locationData.state}</h3>
@@ -780,6 +794,84 @@ const handleChipClick = (message: string) => {
             >
               Keep my numbers
             </button>
+          </div>
+        </div>
+      )}
+      
+      {/* Reference Box: Show after user makes choice and data is complete */}
+      {isLocationLocked && chartsReady && (
+        <div className="reference-box">
+          <div className="reference-box-header">
+            <h4>📊 Analysis Settings</h4>
+          </div>
+          <div className="reference-box-content">
+            {usingZipData && locationData ? (
+              // Scenario 1: Using ZIP data
+              <>
+                <div className="reference-item">
+                  <span className="ref-label">🏠 Home:</span>
+                  <span className="ref-value">${userData.homePrice?.toLocaleString()} <small>({locationData.city})</small></span>
+                </div>
+                <div className="reference-item">
+                  <span className="ref-label">💵 Rent:</span>
+                  <span className="ref-value">${userData.monthlyRent?.toLocaleString()}/mo <small>({locationData.city})</small></span>
+                </div>
+                <div className="reference-item">
+                  <span className="ref-label">💰 Down:</span>
+                  <span className="ref-value">{userData.downPaymentPercent}% <small>(you chose)</small></span>
+                </div>
+                <div className="reference-item">
+                  <span className="ref-label">🏛️ Tax:</span>
+                  <span className="ref-value">{locationData.propertyTaxRate}% <small>({locationData.state})</small></span>
+                </div>
+                <div className="reference-divider"></div>
+                <div className="reference-item">
+                  <span className="ref-label">📈 Rent growth:</span>
+                  <span className="ref-value">3.5%/year <small>(nat'l avg)</small></span>
+                </div>
+                <div className="reference-item">
+                  <span className="ref-label">🏘️ Appreciation:</span>
+                  <span className="ref-value">3.0%/year <small>(nat'l avg)</small></span>
+                </div>
+                <div className="reference-item">
+                  <span className="ref-label">💹 Investment:</span>
+                  <span className="ref-value">7.0%/year <small>(S&P 500)</small></span>
+                </div>
+              </>
+            ) : (
+              // Scenario 2: Using custom data
+              <>
+                <div className="reference-item">
+                  <span className="ref-label">🏠 Home:</span>
+                  <span className="ref-value">${userData.homePrice?.toLocaleString()} <small>(you chose)</small></span>
+                </div>
+                <div className="reference-item">
+                  <span className="ref-label">💵 Rent:</span>
+                  <span className="ref-value">${userData.monthlyRent?.toLocaleString()}/mo <small>(you chose)</small></span>
+                </div>
+                <div className="reference-item">
+                  <span className="ref-label">💰 Down:</span>
+                  <span className="ref-value">{userData.downPaymentPercent}% <small>(you chose)</small></span>
+                </div>
+                <div className="reference-item">
+                  <span className="ref-label">🏛️ Tax:</span>
+                  <span className="ref-value">1.0% <small>(nat'l avg)</small></span>
+                </div>
+                <div className="reference-divider"></div>
+                <div className="reference-item">
+                  <span className="ref-label">📈 Rent growth:</span>
+                  <span className="ref-value">3.5%/year <small>(nat'l avg)</small></span>
+                </div>
+                <div className="reference-item">
+                  <span className="ref-label">🏘️ Appreciation:</span>
+                  <span className="ref-value">3.0%/year <small>(nat'l avg)</small></span>
+                </div>
+                <div className="reference-item">
+                  <span className="ref-label">💹 Investment:</span>
+                  <span className="ref-value">7.0%/year <small>(S&P 500)</small></span>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}
