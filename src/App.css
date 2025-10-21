@@ -775,10 +775,7 @@ body {
 }
 
 .arrow-line {
-  width: 3px;
-  height: 30px;
-  background: linear-gradient(to bottom, transparent, white);
-  border-radius: 2px;
+  display: none;
 }
 
 .arrow-head {
