@@ -574,6 +574,12 @@ function shouldShowChart(aiResponse: string): string | null {
         })
       };
       setMessages(prev => [...prev, confirmationCard]);
+      
+      // Show reference box if user never used ZIP code (normal flow without location data)
+      if (!isLocationLocked && !locationData) {
+        setIsLocationLocked(true);
+        setUsingZipData(false);
+      }
     }
     
     // Then add bot response (so it appears AFTER the card)
