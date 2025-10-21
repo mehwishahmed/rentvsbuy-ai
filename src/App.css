@@ -31,22 +31,15 @@ body {
 
 .app-layout {
   display: flex;
-  gap: 20px;
+  justify-content: center;
+  align-items: center;
   width: 100%;
-  max-width: 1600px;
+  max-width: 1200px;
   height: 95vh;
 }
 
-.insights-sidebar {
-  width: 340px;
-  flex-shrink: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-
 .chat-container {
-  flex: 1;
+  width: 100%;
   display: flex;
   flex-direction: column;
   background: white;
@@ -687,13 +680,22 @@ body {
   background: #f8f9fa;
   border-top: 1px solid #e9ecef;
   padding: 12px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+
+.chart-nav-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: #495057;
 }
 
 .chart-nav-buttons-horizontal {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
-  justify-content: center;
 }
 
 .chart-nav-btn-sm {
@@ -718,6 +720,93 @@ body {
 
 .chart-nav-btn-sm:active {
   transform: translateY(0);
+}
+
+/* Floating "Bottom Line?" Button */
+.bottom-line-trigger {
+  position: fixed;
+  bottom: 80px;
+  right: 30px;
+  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+  color: white;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 30px;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 6px 20px rgba(245, 87, 108, 0.4);
+  transition: all 0.3s ease;
+  z-index: 1000;
+  animation: pulse 2s infinite;
+}
+
+.bottom-line-trigger:hover {
+  transform: translateY(-3px) scale(1.05);
+  box-shadow: 0 8px 25px rgba(245, 87, 108, 0.5);
+}
+
+.bottom-line-trigger:active {
+  transform: translateY(-1px);
+}
+
+@keyframes pulse {
+  0%, 100% {
+    box-shadow: 0 6px 20px rgba(245, 87, 108, 0.4);
+  }
+  50% {
+    box-shadow: 0 6px 30px rgba(245, 87, 108, 0.6);
+  }
+}
+
+/* Insights Modal */
+.insights-modal {
+  background: white;
+  border-radius: 16px;
+  padding: 32px;
+  max-width: 600px;
+  width: 90%;
+  max-height: 80vh;
+  overflow-y: auto;
+  position: relative;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  animation: slideUp 0.3s ease-out;
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.modal-close-btn {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  background: #e9ecef;
+  border: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  font-size: 24px;
+  line-height: 1;
+  cursor: pointer;
+  transition: all 0.2s;
+  color: #495057;
+}
+
+.modal-close-btn:hover {
+  background: #dee2e6;
+  transform: rotate(90deg);
+}
+
+.insights-modal-content {
+  margin-top: 8px;
 }
 
 /* Confirmation Card Styles */
@@ -778,14 +867,16 @@ body {
 
 /* Mobile responsiveness for insights */
 @media (max-width: 1024px) {
-  .app-layout {
-    flex-direction: column;
-    gap: 16px;
+  .bottom-line-trigger {
+    bottom: 70px;
+    right: 15px;
+    padding: 10px 20px;
+    font-size: 14px;
   }
   
-  .insights-sidebar {
-    width: 100%;
-    height: auto;
+  .insights-modal {
+    padding: 24px;
+    width: 95%;
   }
   
   .insights-summary {

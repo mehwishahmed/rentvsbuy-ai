@@ -77,7 +77,7 @@ export function ChatContainer() {
 
 // Track if charts are ready to show (data calculated)
 const [chartsReady, setChartsReady] = useState(false);
-  const [showInsights, setShowInsights] = useState(false); // Only show when user explicitly asks for recommendation
+  const [showInsightsModal, setShowInsightsModal] = useState(false); // Modal visibility
   const [isLoading, setIsLoading] = useState(false);
   const [saveProgress, setSaveProgress] = useState<number | null>(null); // Track PDF save progress
   
@@ -294,7 +294,7 @@ const [chartsReady, setChartsReady] = useState(false);
       rentGrowth: false
     });
     setChartsReady(false);
-    setShowInsights(false);
+    setShowInsightsModal(false);
     setMonthlyCosts(null);
     setTotalCostData(null);
     setShowRestartModal(false);
@@ -449,12 +449,6 @@ function shouldShowChart(aiResponse: string): string | null {
         ...prev,
         [chartToShow]: true
       }));
-      
-      // Check if user is asking for recommendation/advice
-      const isAskingForAdvice = /should i|which|better|recommend|advice|what do you think|your thoughts|bottom line|quick summary/i.test(content);
-      if (isAskingForAdvice) {
-        setShowInsights(true);
-      }
     } else {
       // Normal AI response without chart
       assistantMessage = {
@@ -642,55 +636,15 @@ const handleChipClick = (message: string) => {
   
   return (
     <div className="app-layout">
-      {/* Sidebar with insights and chart buttons */}
-      {chartsReady && (
-        <div className="insights-sidebar">
-          {/* Insights Summary - only show when user asks for recommendations */}
-          {insights && showInsights && (
-            <div className="insights-summary">
-            <div className="insights-header">
-              <h3>📊 Quick Summary</h3>
-              <span className="insights-subtitle">Based on 30-year projection</span>
-            </div>
-            <div className="risk-badge-container">
-              <span className={`risk-badge risk-${insights.risk.toLowerCase()}`}>{insights.risk} Risk</span>
-            </div>
-            
-            <div className="insights-grid">
-              <div className="insight-card primary">
-                <div className="insight-label">30-Year Outcome</div>
-                <div className="insight-value winner">
-                  {insights.winner === 'buying' ? '🏠 Buying' : '🏘️ Renting'}
-                </div>
-                <div className="insight-detail">
-                  Ahead by ${(insights.savings / 1000).toFixed(0)}k
-                </div>
-              </div>
-              
-              <div className="insight-card">
-                <div className="insight-label">Monthly Difference</div>
-                <div className="insight-value">
-                  {insights.monthlyDiff > 0 ? '+' : ''}${Math.abs(insights.monthlyDiff).toFixed(0)}/mo
-                </div>
-                <div className="insight-detail">
-                  {insights.monthlyDiff > 0 
-                    ? 'Buying costs more monthly' 
-                    : 'Renting costs more monthly'}
-                </div>
-              </div>
-              
-              <div className="insight-card">
-                <div className="insight-label">Break-Even Point</div>
-                <div className="insight-value">Year {insights.breakEvenYear}</div>
-                <div className="insight-detail">
-                  When buying starts paying off
-                </div>
-              </div>
-            </div>
-            </div>
-          )}
-          
-        </div>
+      {/* Floating "Bottom Line?" Button - only show when charts are ready */}
+      {chartsReady && insights && (
+        <button 
+          className="bottom-line-trigger"
+          onClick={() => setShowInsightsModal(true)}
+          title="See the bottom line summary"
+        >
+          💡 Bottom Line?
+        </button>
       )}
       
     <div className="chat-container">
@@ -785,6 +739,7 @@ Restart
       {/* Chart Navigation Buttons - above input for convenience */}
       {chartsReady && (
         <div className="chart-nav-bar">
+          <span className="chart-nav-label">📊 Charts:</span>
           <div className="chart-nav-buttons-horizontal">
             <button 
               className="chart-nav-btn-sm"
@@ -822,9 +777,9 @@ Restart
               📊 Rent
             </button>
           </div>
-        </div>
-      )}
-      
+              </div>
+            )}
+  
       <ChatInput onSend={handleSendMessage} />
       
         {/* Footer */}
@@ -895,6 +850,63 @@ Restart
               </div>
               </div>
             )}
+            
+      {/* Bottom Line Insights Modal */}
+      {showInsightsModal && insights && (
+        <div className="modal-overlay" onClick={() => setShowInsightsModal(false)}>
+          <div className="insights-modal" onClick={(e) => e.stopPropagation()}>
+            <button 
+              className="modal-close-btn"
+              onClick={() => setShowInsightsModal(false)}
+              aria-label="Close"
+            >
+              ×
+            </button>
+            
+            <div className="insights-modal-content">
+              <div className="insights-header">
+                <h3>💡 The Bottom Line</h3>
+                <span className="insights-subtitle">Based on 30-year projection</span>
+              </div>
+              <div className="risk-badge-container">
+                <span className={`risk-badge risk-${insights.risk.toLowerCase()}`}>{insights.risk} Risk</span>
+              </div>
+              
+              <div className="insights-grid">
+                <div className="insight-card primary">
+                  <div className="insight-label">30-Year Outcome</div>
+                  <div className="insight-value winner">
+                    {insights.winner === 'buying' ? '🏠 Buying' : '🏘️ Renting'}
+                  </div>
+                  <div className="insight-detail">
+                    Ahead by ${(insights.savings / 1000).toFixed(0)}k
+                  </div>
+                </div>
+                
+                <div className="insight-card">
+                  <div className="insight-label">Monthly Difference</div>
+                  <div className="insight-value">
+                    {insights.monthlyDiff > 0 ? '+' : ''}${Math.abs(insights.monthlyDiff).toFixed(0)}/mo
+                  </div>
+                  <div className="insight-detail">
+                    {insights.monthlyDiff > 0 
+                      ? 'Buying costs more monthly' 
+                      : 'Renting costs more monthly'}
+                  </div>
+                </div>
+                
+                <div className="insight-card">
+                  <div className="insight-label">Break-Even Point</div>
+                  <div className="insight-value">Year {insights.breakEvenYear}</div>
+                  <div className="insight-detail">
+                    When buying starts paying off
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
   
