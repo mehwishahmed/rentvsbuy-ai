@@ -313,17 +313,46 @@ const [chartsReady, setChartsReady] = useState(false);
 
   const handleUseLocalData = () => {
     if (locationData) {
-      setUserData({
+      const newUserData = {
         homePrice: locationData.medianHomePrice,
         monthlyRent: locationData.averageRent,
-        downPaymentPercent: userData.downPaymentPercent || 20 // Keep existing down payment or default to 20%
-      });
-      setShowLocationCard(false);
+        downPaymentPercent: userData.downPaymentPercent || null // Keep existing or null to ask
+      };
+      setUserData(newUserData);
+      
+      // Keep card visible for reference (already handled by not calling setShowLocationCard(false))
+      
+      // Add AI message asking for down payment
+      const aiMessage: Message = {
+        id: Date.now().toString(),
+        role: 'assistant',
+        content: `Perfect! I've updated your scenario with ${locationData.city}, ${locationData.state} market data. Last thing—what down payment percentage are you thinking?`
+      };
+      setMessages(prev => [...prev, aiMessage]);
     }
   };
 
   const handleKeepMyData = () => {
-    setShowLocationCard(false);
+    if (locationData) {
+      // Hide the location card
+      setShowLocationCard(false);
+      
+      // Add AI message with preset assumptions and ask for their numbers
+      const aiMessage: Message = {
+        id: Date.now().toString(),
+        role: 'assistant',
+        content: `Got it! For your reference, I'll be using these default assumptions:
+
+📍 **Default Assumptions (National Averages):**
+• Property tax: 1.0%
+• Rent growth: 3.5%/year
+• Home appreciation: 3.0%/year
+• Investment return: 7.0%/year
+
+Now, what home price and monthly rent are you working with?`
+      };
+      setMessages(prev => [...prev, aiMessage]);
+    }
   };
 
   // Simple function to check if AI response indicates a chart should be shown
@@ -694,7 +723,7 @@ const handleChipClick = (message: string) => {
       {showLocationCard && locationData && (
         <div className="location-data-card">
           <div className="location-card-header">
-            <h3>📍 Based on {locationData.city}, {locationData.state} data:</h3>
+            <h3>📍 {locationData.city}, {locationData.state}</h3>
             <button 
               className="location-card-close"
               onClick={() => setShowLocationCard(false)}
@@ -704,6 +733,7 @@ const handleChipClick = (message: string) => {
             </button>
           </div>
           <div className="location-card-content">
+            <div className="location-section-title">Local Market Data:</div>
             <div className="location-data-item">
               <span className="location-icon">🏠</span>
               <span className="location-label">Median home price:</span>
@@ -718,6 +748,23 @@ const handleChipClick = (message: string) => {
               <span className="location-icon">🏛️</span>
               <span className="location-label">Property tax rate:</span>
               <span className="location-value">{locationData.propertyTaxRate}%</span>
+            </div>
+            
+            <div className="location-section-title" style={{ marginTop: '12px' }}>National Averages:</div>
+            <div className="location-data-item">
+              <span className="location-icon">📈</span>
+              <span className="location-label">Rent growth:</span>
+              <span className="location-value">3.5%/year</span>
+            </div>
+            <div className="location-data-item">
+              <span className="location-icon">🏘️</span>
+              <span className="location-label">Home appreciation:</span>
+              <span className="location-value">3.0%/year</span>
+            </div>
+            <div className="location-data-item">
+              <span className="location-icon">💹</span>
+              <span className="location-label">Investment return:</span>
+              <span className="location-value">7.0%/year</span>
             </div>
           </div>
           <div className="location-card-actions">

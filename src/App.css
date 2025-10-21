@@ -830,17 +830,19 @@ body {
 /* Location Data Card */
 .location-data-card {
   position: fixed;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
+  top: 20px;
+  right: 20px;
   background: white;
-  border-radius: 16px;
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
-  padding: 24px;
-  max-width: 500px;
+  border-radius: 12px;
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+  padding: 20px;
+  max-width: 350px;
+  max-height: calc(100vh - 40px);
+  overflow-y: auto;
   width: 90%;
   z-index: 1001;
   animation: locationCardFadeIn 0.3s ease-out;
+  border: 1px solid #e2e8f0;
 }
 
 .location-card-header {
@@ -852,7 +854,7 @@ body {
 
 .location-card-header h3 {
   color: #2d3748;
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 600;
   margin: 0;
 }
@@ -872,7 +874,15 @@ body {
 }
 
 .location-card-content {
-  margin-bottom: 24px;
+  margin-bottom: 16px;
+}
+
+.location-section-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #667eea;
+  margin-bottom: 8px;
+  margin-top: 4px;
 }
 
 .location-data-item {
@@ -940,14 +950,28 @@ body {
   border-color: #cbd5e0;
 }
 
+.location-card-note {
+  margin-top: 12px;
+  padding: 8px 12px;
+  background: #f7fafc;
+  border-radius: 6px;
+  border-left: 3px solid #667eea;
+}
+
+.location-card-note small {
+  color: #4a5568;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
 @keyframes locationCardFadeIn {
   from {
     opacity: 0;
-    transform: translate(-50%, -50%) scale(0.9);
+    transform: translateX(20px);
   }
   to {
     opacity: 1;
-    transform: translate(-50%, -50%) scale(1);
+    transform: translateX(0);
   }
 }
 
