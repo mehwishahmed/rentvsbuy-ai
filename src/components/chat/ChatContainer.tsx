@@ -5,6 +5,7 @@ import { ChatMessage } from './ChatMessage';
 import { ChatInput } from './ChatInput';
 import { NetWorthChart } from '../charts/NetWorthChart';
 import { calculateNetWorthComparison, calculateBuyingCosts, calculateRentingCosts } from '../../lib/finance/calculator';
+import { getLocationData, formatLocationData, detectZipCode, type FormattedLocationData } from '../../lib/location/zipCodeService';
 import type { ScenarioInputs, MonthlySnapshot } from '../../types/calculator';
 import { MonthlyCostChart } from '../charts/MonthlyCostChart';
 import { TotalCostChart } from '../charts/TotalCostChart';
@@ -83,6 +84,10 @@ const [chartsReady, setChartsReady] = useState(false);
   
   // Restart modal state
   const [showRestartModal, setShowRestartModal] = useState(false);
+  
+  // Location data state
+  const [locationData, setLocationData] = useState<FormattedLocationData | null>(null);
+  const [showLocationCard, setShowLocationCard] = useState(false);
   
   // Ref for scrolling to charts
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -302,6 +307,23 @@ const [chartsReady, setChartsReady] = useState(false);
     setMonthlyCosts(null);
     setTotalCostData(null);
     setShowRestartModal(false);
+    setLocationData(null);
+    setShowLocationCard(false);
+  };
+
+  const handleUseLocalData = () => {
+    if (locationData) {
+      setUserData({
+        homePrice: locationData.medianHomePrice,
+        monthlyRent: locationData.averageRent,
+        downPaymentPercent: userData.downPaymentPercent || 20 // Keep existing down payment or default to 20%
+      });
+      setShowLocationCard(false);
+    }
+  };
+
+  const handleKeepMyData = () => {
+    setShowLocationCard(false);
   };
 
   // Simple function to check if AI response indicates a chart should be shown
@@ -331,7 +353,13 @@ function shouldShowChart(aiResponse: string): string | null {
     setIsLoading(true);
     
     // Extract data from message
-    const newUserData = extractUserData(content, userData);
+    const { userData: newUserData, locationData: detectedLocationData } = extractUserData(content, userData);
+    
+    // Handle location data if detected
+    if (detectedLocationData) {
+      setLocationData(detectedLocationData);
+      setShowLocationCard(true);
+    }
     setUserData(newUserData);
     
     // Check if we have all data and if it changed
@@ -659,6 +687,53 @@ const handleChipClick = (message: string) => {
         </button>
       )}
       
+      {/* Location Data Card */}
+      {showLocationCard && locationData && (
+        <div className="location-data-card">
+          <div className="location-card-header">
+            <h3>📍 Based on {locationData.city}, {locationData.state} data:</h3>
+            <button 
+              className="location-card-close"
+              onClick={() => setShowLocationCard(false)}
+              title="Close"
+            >
+              ×
+            </button>
+          </div>
+          <div className="location-card-content">
+            <div className="location-data-item">
+              <span className="location-icon">🏠</span>
+              <span className="location-label">Median home price:</span>
+              <span className="location-value">${locationData.medianHomePrice.toLocaleString()}</span>
+            </div>
+            <div className="location-data-item">
+              <span className="location-icon">💵</span>
+              <span className="location-label">Average rent:</span>
+              <span className="location-value">${locationData.averageRent.toLocaleString()}/mo</span>
+            </div>
+            <div className="location-data-item">
+              <span className="location-icon">🏛️</span>
+              <span className="location-label">Property tax rate:</span>
+              <span className="location-value">{locationData.propertyTaxRate}%</span>
+            </div>
+          </div>
+          <div className="location-card-actions">
+            <button 
+              className="location-btn location-btn-primary"
+              onClick={handleUseLocalData}
+            >
+              Use this data
+            </button>
+            <button 
+              className="location-btn location-btn-secondary"
+              onClick={handleKeepMyData}
+            >
+              Keep my numbers
+            </button>
+          </div>
+        </div>
+      )}
+      
     <div className="chat-container">
       <div className="chat-header">
         <h1>RentVsBuy.ai</h1>
@@ -948,9 +1023,20 @@ Restart
 // Extract numbers from user messages
 
 // Extract numbers from user messages - handles comma-separated values!
-function extractUserData(message: string, currentData: UserData): UserData {
+function extractUserData(message: string, currentData: UserData): { userData: UserData; locationData: FormattedLocationData | null } {
   const newData = { ...currentData };
   const lowerMessage = message.toLowerCase();
+  
+  // Check for ZIP code
+  const zipCode = detectZipCode(message);
+  let locationData: FormattedLocationData | null = null;
+  
+  if (zipCode) {
+    const rawLocationData = getLocationData(zipCode);
+    if (rawLocationData) {
+      locationData = formatLocationData(rawLocationData);
+    }
+  }
   
   // Check if user is providing NEW values (overwrite mode)
   const isNewData = lowerMessage.includes('new') || 
@@ -1042,5 +1128,5 @@ function extractUserData(message: string, currentData: UserData): UserData {
     }
   }
   
-  return newData;
+  return { userData: newData, locationData };
 }
