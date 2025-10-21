@@ -765,24 +765,29 @@ body {
 /* Arrow pointing to button */
 .bottom-line-arrow {
   position: absolute;
-  bottom: 60px;
-  right: -20px;
+  bottom: 55px;
+  left: 50%;
+  transform: translateX(-50%);
   z-index: 999;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 
 .arrow-line {
   width: 2px;
-  height: 30px;
-  background: linear-gradient(to top, #f5576c, transparent);
-  margin-left: 10px;
+  height: 25px;
+  background: linear-gradient(to bottom, transparent, #f5576c);
 }
 
 .arrow-head {
-  font-size: 20px;
+  font-size: 24px;
   color: #f5576c;
   font-weight: bold;
-  margin-left: 2px;
+  line-height: 1;
   animation: arrowPulse 2s ease-in-out infinite;
+  margin-top: -5px;
+  transform: rotate(90deg);
 }
 
 .bottom-line-trigger:hover {
@@ -805,11 +810,11 @@ body {
 @keyframes arrowPulse {
   0%, 100% {
     opacity: 0.7;
-    transform: translateX(0);
+    transform: rotate(90deg) translateX(0);
   }
   50% {
     opacity: 1;
-    transform: translateX(3px);
+    transform: rotate(90deg) translateX(3px);
   }
 }
 
