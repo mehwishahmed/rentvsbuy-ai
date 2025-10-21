@@ -17,7 +17,7 @@ import jsPDF from 'jspdf';
 
 interface Message {
   id: string;
-  role: 'user' | 'assistant';
+  role: 'user' | 'assistant' | 'system';
   content: string;
   chartToShow?: 'netWorth' | 'monthlyCost' | 'totalCost' | 'equity' | 'rentGrowth';
   // Store chart data with the message so it doesn't change when new scenarios are calculated
@@ -55,7 +55,7 @@ export function ChatContainer() {
     {
       id: '1',
       role: 'assistant',
-      content: "Hi! I'm your rent vs buy advisor. Tell me about your situation - what's the price of the house you're looking at?"
+      content: "Hi! I'm here to help you figure out whether buying or renting makes more financial sense for you. To get started, tell me: what's the home price you're considering and your current monthly rent?"
     }
   ]);
   
@@ -276,7 +276,7 @@ const [chartsReady, setChartsReady] = useState(false);
       {
         id: '1',
         role: 'assistant',
-        content: "Hi! I'm your rent vs buy advisor. Tell me about your situation - what's the price of the house you're looking at?"
+        content: "Hi! I'm here to help you figure out whether buying or renting makes more financial sense for you. To get started, tell me: what's the home price you're considering and your current monthly rent?"
       }
     ]);
     setUserData({
@@ -458,6 +458,22 @@ function shouldShowChart(aiResponse: string): string | null {
     
     // Add bot response
     setMessages(prev => [...prev, assistantMessage]);
+    
+    // If we just got all data for the first time, add confirmation card
+    if (hasAllData && !chartsReady) {
+      const confirmationCard: Message = {
+        id: (Date.now() + 2).toString(),
+        role: 'system', // Special type for UI cards
+        content: JSON.stringify({
+          type: 'confirmation',
+          homePrice: newUserData.homePrice!,
+          monthlyRent: newUserData.monthlyRent!,
+          downPaymentPercent: newUserData.downPaymentPercent!
+        })
+      };
+      setMessages(prev => [...prev, confirmationCard]);
+    }
+    
     setIsLoading(false);
     
     // If we have all data and haven't calculated yet (initial case, not data change)
@@ -660,10 +676,57 @@ const handleChipClick = (message: string) => {
               </div>
             </div>
           </div>
+          
+          {/* Chart Navigation Buttons */}
+          <div className="chart-nav-section">
+            <h4>📊 View Charts</h4>
+            <div className="chart-nav-buttons">
+              <button 
+                className={`chart-nav-btn ${!chartsReady ? 'disabled' : ''}`}
+                onClick={() => chartsReady && handleChipClick('show me monthly costs')}
+                disabled={!chartsReady}
+                title={!chartsReady ? 'Provide data first' : 'View Monthly Costs'}
+              >
+                💰 Monthly Costs
+              </button>
+              <button 
+                className={`chart-nav-btn ${!chartsReady ? 'disabled' : ''}`}
+                onClick={() => chartsReady && handleChipClick('show me net worth')}
+                disabled={!chartsReady}
+                title={!chartsReady ? 'Provide data first' : 'View Net Worth'}
+              >
+                📈 Net Worth
+              </button>
+              <button 
+                className={`chart-nav-btn ${!chartsReady ? 'disabled' : ''}`}
+                onClick={() => chartsReady && handleChipClick('show me total cost')}
+                disabled={!chartsReady}
+                title={!chartsReady ? 'Provide data first' : 'View Total Cost'}
+              >
+                💵 Total Cost
+              </button>
+              <button 
+                className={`chart-nav-btn ${!chartsReady ? 'disabled' : ''}`}
+                onClick={() => chartsReady && handleChipClick('show me equity buildup')}
+                disabled={!chartsReady}
+                title={!chartsReady ? 'Provide data first' : 'View Equity Buildup'}
+              >
+                🏠 Equity Buildup
+              </button>
+              <button 
+                className={`chart-nav-btn ${!chartsReady ? 'disabled' : ''}`}
+                onClick={() => chartsReady && handleChipClick('show me rent growth')}
+                disabled={!chartsReady}
+                title={!chartsReady ? 'Provide data first' : 'View Rent Growth'}
+              >
+                📊 Rent Growth
+              </button>
+            </div>
+          </div>
         </div>
       )}
       
-    <div className="chat-container">
+      <div className="chat-container">
       <div className="chat-header">
         <h1>RentVsBuy.ai</h1>
           <div className="header-buttons">
@@ -687,10 +750,46 @@ Restart
       <div className="messages-container">
         {messages.map(message => (
           <div key={message.id} data-message-id={message.id}>
-          <ChatMessage
-            role={message.role}
-            content={message.content}
-          />
+            {/* Render confirmation card for system messages */}
+            {message.role === 'system' ? (
+              (() => {
+                try {
+                  const data = JSON.parse(message.content);
+                  if (data.type === 'confirmation') {
+                    const downPaymentAmount = (data.homePrice * data.downPaymentPercent) / 100;
+                    return (
+                      <div className="confirmation-card">
+                        <div className="confirmation-header">✓ Your Scenario</div>
+                        <div className="confirmation-details">
+                          <div className="confirmation-item">
+                            <span className="confirmation-icon">🏠</span>
+                            <span className="confirmation-label">Home:</span>
+                            <span className="confirmation-value">${data.homePrice.toLocaleString()}</span>
+                          </div>
+                          <div className="confirmation-item">
+                            <span className="confirmation-icon">💵</span>
+                            <span className="confirmation-label">Rent:</span>
+                            <span className="confirmation-value">${data.monthlyRent.toLocaleString()}/mo</span>
+                          </div>
+                          <div className="confirmation-item">
+                            <span className="confirmation-icon">💰</span>
+                            <span className="confirmation-label">Down:</span>
+                            <span className="confirmation-value">{data.downPaymentPercent}% (${downPaymentAmount.toLocaleString()})</span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  }
+                } catch (e) {
+                  return null;
+                }
+              })()
+            ) : (
+              <ChatMessage
+                role={message.role}
+                content={message.content}
+              />
+            )}
             {/* Render chart right after message if it has one - uses message's snapshot data */}
             {message.chartToShow && renderChart(message.chartToShow, message.snapshotData)}
           </div>
