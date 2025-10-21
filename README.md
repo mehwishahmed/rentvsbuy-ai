@@ -13,7 +13,8 @@ RentVsBuy.ai is a web application that analyzes your housing situation and provi
 ### 💬 Conversational AI Interface
 - Natural language interaction powered by OpenAI GPT-4
 - Friendly, approachable advisor that explains complex financial concepts
-- Asks clarifying questions to understand your situation
+- Asks 2-3 questions at once for faster data collection
+- Handles distractions and invalid input gracefully
 - No complicated forms—just chat naturally
 
 ### 📊 Interactive Financial Charts
@@ -26,18 +27,28 @@ The app generates **5 comprehensive charts** to help you visualize your financia
 5. **Rent Growth vs Fixed Mortgage** - Demonstrates how rent increases over time while mortgage payments stay fixed
 
 ### 📊 Key Insights Summary
-- Instant "Bottom Line" recommendation displayed in sidebar
+- Instant "Bottom Line" summary modal (click "💡 Summary" button)
 - Shows winner (Buying vs Renting) with 30-year savings
 - Monthly cost difference at a glance
 - Break-even year calculation
 - Risk assessment based on down payment percentage
+- Professional, unobtrusive design that appears on demand
 
 ### 🔄 Dynamic Scenario Testing
 - Test multiple scenarios in a single conversation
 - Change home price, rent, or down payment mid-chat
+- Switch between different ZIP codes to compare locations
 - Historical charts remain visible for comparison
-- All suggestion chips refresh when you provide new data
-- Insights sidebar updates automatically with new scenarios
+- All chart navigation buttons refresh when you provide new data
+- Input confirmation card shows your current scenario at a glance
+
+### 📍 Location-Based Data (NEW!)
+- Mention any ZIP code to get local market data for 26,000+ locations
+- Automatically pulls median home prices and average rent for your area
+- Location-specific property tax rates by state
+- Choose to use local data OR enter your own custom values
+- Reference box shows exactly what data is being used (local vs. custom vs. national averages)
+- Switch ZIP codes mid-conversation to compare different areas
 
 ### 💾 Professional PDF Export
 - Save your entire conversation and all charts in a single PDF
@@ -97,19 +108,23 @@ All calculations use industry-standard formulas:
 
 1. **Start a conversation**
    - The AI will greet you and ask about your situation
-   - Provide three key pieces of information:
+   - **Option A:** Mention your ZIP code (e.g., "I'm in 92129") to get local data
+   - **Option B:** Provide your own values directly
+   - Three key pieces of information needed:
      - Home price (e.g., "$500,000" or "500k")
      - Monthly rent (e.g., "$3,000" or "3k")
      - Down payment percentage (e.g., "20%" or "20")
 
 2. **Get instant analysis**
    - Once you provide all three values, charts are generated in the background
-   - The AI will suggest viewing specific charts based on your questions
+   - Input confirmation card shows your scenario
+   - Reference box appears showing all values being used (with sources: ZIP data vs. custom vs. national averages)
 
 3. **Request charts**
    - Ask to see any of the 5 available charts
    - Use natural language: "show me net worth comparison" or "can I see monthly costs?"
-   - Click suggestion chips for quick access
+   - Click dedicated chart navigation buttons for instant access
+   - Click suggestion chips for contextual questions
 
 4. **Ask questions**
    - "What if rent increases faster?"
@@ -208,9 +223,10 @@ This project is in **active development** and currently operates at a foundation
 
 **Input Data:**
 - Requires only 3 basic inputs (home price, rent, down payment)
-- Uses default values for interest rates, taxes, and insurance
-- No location-specific data (property taxes vary by state/city)
-- No customization for investment returns or appreciation rates
+- Uses default values for interest rates and insurance
+- ~~No location-specific data~~ ✅ **NEW: ZIP code integration with 26,000+ locations**
+- ~~Property taxes vary by state/city~~ ✅ **NEW: Location-specific property tax rates**
+- No customization for investment returns or appreciation rates in UI (uses industry standards)
 
 **Chart Options:**
 - Limited to 5 pre-built chart types
@@ -218,21 +234,21 @@ This project is in **active development** and currently operates at a foundation
 - No mortgage rate or loan term adjustments in UI
 
 **Assumptions:**
-- 7% mortgage interest rate
+- 7% mortgage interest rate (industry standard for current market)
 - 30-year fixed loan term
-- 1% annual property tax rate
-- 3% home appreciation rate
-- 3.5% rent growth rate
-- 7% investment return rate (for renting scenario)
+- ~~1% annual property tax rate~~ ✅ **NEW: Location-specific rates (0.3% - 2.5% depending on state)**
+- 3% home appreciation rate (national average)
+- 3.5% rent growth rate (national average)
+- 7% investment return rate (S&P 500 historical average)
 
 ### Planned Features 🚀
 
 **Phase 1: Enhanced Input Options**
-- ZIP code integration for location-specific data
-- Property tax rates based on location
-- Adjustable interest rates and loan terms
-- Custom insurance and HOA costs
-- Variable down payment amounts (not just percentages)
+- ~~ZIP code integration for location-specific data~~ ✅ **COMPLETED**
+- ~~Property tax rates based on location~~ ✅ **COMPLETED**
+- Adjustable interest rates and loan terms (UI sliders)
+- Custom insurance and HOA costs (UI inputs)
+- Home appreciation and rent growth rate customization per location
 
 **Phase 2: Advanced Charts**
 - Sensitivity analysis (what-if scenarios)
@@ -280,12 +296,16 @@ rentvsbuy-ai/
 │   │       ├── ChatInput.tsx
 │   │       ├── ChatMessage.tsx
 │   │       └── SuggestionChips.tsx
+│   ├── data/
+│   │   └── zipCodeData.json  # 26,000+ ZIP codes with market data
 │   ├── lib/
 │   │   ├── ai/
 │   │   │   └── openai.ts     # AI integration
-│   │   └── finance/
-│   │       ├── calculator.ts  # Financial formulas
-│   │       └── calculator.test.ts
+│   │   ├── finance/
+│   │   │   ├── calculator.ts  # Financial formulas
+│   │   │   └── calculator.test.ts
+│   │   └── location/
+│   │       └── zipCodeService.ts  # ZIP code data service
 │   ├── types/
 │   │   └── calculator.ts      # TypeScript types
 │   ├── App.tsx
