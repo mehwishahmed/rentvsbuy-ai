@@ -317,11 +317,15 @@ const [chartsReady, setChartsReady] = useState(false);
 
   const handleUseLocalData = () => {
     if (locationData) {
-      const newUserData = {
+      // CRITICAL: Create completely fresh userData with ONLY ZIP values
+      // Clear any previous custom values to avoid showing stale data
+      const newUserData: UserData = {
         homePrice: locationData.medianHomePrice,
         monthlyRent: locationData.averageRent,
-        downPaymentPercent: userData.downPaymentPercent || null // Keep existing or null to ask
+        downPaymentPercent: null // Always ask for down payment with new ZIP
       };
+      
+      console.log('🔄 handleUseLocalData - Setting userData to:', newUserData);
       setUserData(newUserData);
       
       // Lock the card in reference mode
