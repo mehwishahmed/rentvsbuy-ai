@@ -81,16 +81,16 @@ export function RentGrowthChart({ data, monthlyMortgage }: RentGrowthChartProps)
       </ResponsiveContainer>
       
       <div style={{ marginTop: '20px', padding: '20px', background: '#f7fafc', borderRadius: '12px' }}>
-        <h4 style={{ marginBottom: '12px', color: '#black' }}>What This Shows:</h4>
-        <p style={{ marginBottom: '8px', lineHeight: '1.6' }}>
+        <h4 style={{ marginBottom: '12px', color: '#2d3748' }}>What This Shows:</h4>
+        <p style={{ marginBottom: '8px', lineHeight: '1.6', color: '#2d3748' }}>
           This illustrates the <strong>"rent trap"</strong> - rent increases every year (typically 3-4%), 
           while your mortgage payment stays the same for 30 years.
         </p>
-        <ul style={{ marginLeft: '20px', lineHeight: '1.8' }}>
+        <ul style={{ marginLeft: '20px', lineHeight: '1.8', color: '#2d3748' }}>
           <li><strong>Red line (Rent):</strong> Climbs steadily due to inflation</li>
           <li><strong>Blue line (Mortgage):</strong> Flat - locked in at today's rate</li>
         </ul>
-        <p style={{ marginTop: '12px', padding: '12px', background: '#edf2f7', borderRadius: '8px', margin: 0 }}>
+        <p style={{ marginTop: '12px', padding: '12px', background: '#edf2f7', borderRadius: '8px', margin: 0, color: '#2d3748' }}>
           <strong>Key insight:</strong> Even if buying costs more TODAY, it might be cheaper TOMORROW 
           because your housing cost is locked in while rent keeps rising!
         </p>

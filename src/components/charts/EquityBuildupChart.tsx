@@ -80,16 +80,16 @@ export function EquityBuildupChart({ data }: EquityBuildupChartProps) {
       </ResponsiveContainer>
       
       <div style={{ marginTop: '20px', padding: '20px', background: '#f7fafc', borderRadius: '12px' }}>
-        <h4 style={{ marginBottom: '12px', color: '#black' }}>What This Shows:</h4>
-        <p style={{ marginBottom: '8px', lineHeight: '1.6' }}>
+        <h4 style={{ marginBottom: '12px', color: '#2d3748' }}>What This Shows:</h4>
+        <p style={{ marginBottom: '8px', lineHeight: '1.6', color: '#2d3748' }}>
           This chart shows how much of your home you actually <strong>own</strong> over time (your equity).
         </p>
-        <ul style={{ marginLeft: '20px', lineHeight: '1.8' }}>
+        <ul style={{ marginLeft: '20px', lineHeight: '1.8', color: '#2d3748' }}>
           <li><strong>Early years (0-10):</strong> Most payments go to interest, equity builds slowly</li>
           <li><strong>Middle years (10-20):</strong> More goes to principal, equity builds faster</li>
           <li><strong>Later years (20-30):</strong> Mostly principal payments, equity accelerates</li>
         </ul>
-        <p style={{ marginTop: '12px', padding: '12px', background: '#edf2f7', borderRadius: '8px', margin: 0 }}>
+        <p style={{ marginTop: '12px', padding: '12px', background: '#edf2f7', borderRadius: '8px', margin: 0, color: '#2d3748' }}>
           <strong>Key insight:</strong> If you sell early (5-10 years), you won't have much equity due to closing costs 
           and the fact that early payments are mostly interest!
         </p>
