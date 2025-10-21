@@ -456,10 +456,7 @@ function shouldShowChart(aiResponse: string): string | null {
     };
     }
     
-    // Add bot response
-    setMessages(prev => [...prev, assistantMessage]);
-    
-    // If we just got all data for the first time, add confirmation card
+    // If we just got all data for the first time, add confirmation card FIRST
     if (hasAllData && !chartsReady) {
       const confirmationCard: Message = {
         id: (Date.now() + 2).toString(),
@@ -474,6 +471,8 @@ function shouldShowChart(aiResponse: string): string | null {
       setMessages(prev => [...prev, confirmationCard]);
     }
     
+    // Then add bot response (so it appears AFTER the card)
+    setMessages(prev => [...prev, assistantMessage]);
     setIsLoading(false);
     
     // If we have all data and haven't calculated yet (initial case, not data change)
@@ -726,7 +725,7 @@ const handleChipClick = (message: string) => {
         </div>
       )}
       
-      <div className="chat-container">
+    <div className="chat-container">
       <div className="chat-header">
         <h1>RentVsBuy.ai</h1>
           <div className="header-buttons">
@@ -785,10 +784,10 @@ Restart
                 }
               })()
             ) : (
-              <ChatMessage
-                role={message.role}
-                content={message.content}
-              />
+          <ChatMessage
+            role={message.role}
+            content={message.content}
+          />
             )}
             {/* Render chart right after message if it has one - uses message's snapshot data */}
             {message.chartToShow && renderChart(message.chartToShow, message.snapshotData)}
