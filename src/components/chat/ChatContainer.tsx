@@ -909,7 +909,7 @@ Restart
                       ? 'Buying costs more monthly' 
                       : 'Renting costs more monthly'}
                   </div>
-                </div>
+      </div>
       
                 <div className="insight-card">
                   <div className="insight-label">Break-Even Point</div>
