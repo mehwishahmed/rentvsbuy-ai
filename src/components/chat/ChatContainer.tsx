@@ -77,7 +77,7 @@ export function ChatContainer() {
 
 // Track if charts are ready to show (data calculated)
 const [chartsReady, setChartsReady] = useState(false);
-  const [hasViewedChart, setHasViewedChart] = useState(false); // Track if user has viewed at least one chart
+  const [showInsights, setShowInsights] = useState(false); // Only show when user explicitly asks for recommendation
   const [isLoading, setIsLoading] = useState(false);
   const [saveProgress, setSaveProgress] = useState<number | null>(null); // Track PDF save progress
   
@@ -294,7 +294,7 @@ const [chartsReady, setChartsReady] = useState(false);
       rentGrowth: false
     });
     setChartsReady(false);
-    setHasViewedChart(false);
+    setShowInsights(false);
     setMonthlyCosts(null);
     setTotalCostData(null);
     setShowRestartModal(false);
@@ -450,8 +450,11 @@ function shouldShowChart(aiResponse: string): string | null {
         [chartToShow]: true
       }));
       
-      // User has now viewed a chart - show sidebar
-      setHasViewedChart(true);
+      // Check if user is asking for recommendation/advice
+      const isAskingForAdvice = /should i|which|better|recommend|advice|what do you think|your thoughts|bottom line|quick summary/i.test(content);
+      if (isAskingForAdvice) {
+        setShowInsights(true);
+      }
     } else {
       // Normal AI response without chart
       assistantMessage = {
@@ -642,8 +645,8 @@ const handleChipClick = (message: string) => {
       {/* Sidebar with insights and chart buttons */}
       {chartsReady && (
         <div className="insights-sidebar">
-          {/* Insights Summary - only show after first chart viewed */}
-          {insights && hasViewedChart && (
+          {/* Insights Summary - only show when user asks for recommendations */}
+          {insights && showInsights && (
             <div className="insights-summary">
             <div className="insights-header">
               <h3>📊 Quick Summary</h3>
@@ -687,52 +690,6 @@ const handleChipClick = (message: string) => {
             </div>
           )}
           
-          {/* Chart Navigation Buttons - always visible when charts ready */}
-          <div className="chart-nav-section">
-            <h4>📊 View Charts</h4>
-            <div className="chart-nav-buttons">
-              <button 
-                className={`chart-nav-btn ${!chartsReady ? 'disabled' : ''}`}
-                onClick={() => chartsReady && handleChipClick('show me monthly costs')}
-                disabled={!chartsReady}
-                title={!chartsReady ? 'Provide data first' : 'View Monthly Costs'}
-              >
-                💰 Monthly Costs
-              </button>
-              <button 
-                className={`chart-nav-btn ${!chartsReady ? 'disabled' : ''}`}
-                onClick={() => chartsReady && handleChipClick('show me net worth')}
-                disabled={!chartsReady}
-                title={!chartsReady ? 'Provide data first' : 'View Net Worth'}
-              >
-                📈 Net Worth
-              </button>
-              <button 
-                className={`chart-nav-btn ${!chartsReady ? 'disabled' : ''}`}
-                onClick={() => chartsReady && handleChipClick('show me total cost')}
-                disabled={!chartsReady}
-                title={!chartsReady ? 'Provide data first' : 'View Total Cost'}
-              >
-                💵 Total Cost
-              </button>
-              <button 
-                className={`chart-nav-btn ${!chartsReady ? 'disabled' : ''}`}
-                onClick={() => chartsReady && handleChipClick('show me equity buildup')}
-                disabled={!chartsReady}
-                title={!chartsReady ? 'Provide data first' : 'View Equity Buildup'}
-              >
-                🏠 Equity Buildup
-              </button>
-              <button 
-                className={`chart-nav-btn ${!chartsReady ? 'disabled' : ''}`}
-                onClick={() => chartsReady && handleChipClick('show me rent growth')}
-                disabled={!chartsReady}
-                title={!chartsReady ? 'Provide data first' : 'View Rent Growth'}
-              >
-                📊 Rent Growth
-              </button>
-            </div>
-          </div>
         </div>
       )}
       
@@ -824,6 +781,49 @@ Restart
           />
         )}
       </div>
+      
+      {/* Chart Navigation Buttons - above input for convenience */}
+      {chartsReady && (
+        <div className="chart-nav-bar">
+          <div className="chart-nav-buttons-horizontal">
+            <button 
+              className="chart-nav-btn-sm"
+              onClick={() => handleChipClick('show me monthly costs')}
+              title="View Monthly Costs"
+            >
+              💰 Monthly
+            </button>
+            <button 
+              className="chart-nav-btn-sm"
+              onClick={() => handleChipClick('show me net worth')}
+              title="View Net Worth"
+            >
+              📈 Net Worth
+            </button>
+            <button 
+              className="chart-nav-btn-sm"
+              onClick={() => handleChipClick('show me total cost')}
+              title="View Total Cost"
+            >
+              💵 Total Cost
+            </button>
+            <button 
+              className="chart-nav-btn-sm"
+              onClick={() => handleChipClick('show me equity buildup')}
+              title="View Equity Buildup"
+            >
+              🏠 Equity
+            </button>
+            <button 
+              className="chart-nav-btn-sm"
+              onClick={() => handleChipClick('show me rent growth')}
+              title="View Rent Growth"
+            >
+              📊 Rent
+            </button>
+          </div>
+        </div>
+      )}
       
       <ChatInput onSend={handleSendMessage} />
       

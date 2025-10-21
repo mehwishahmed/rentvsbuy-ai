@@ -682,6 +682,44 @@ body {
   transform: translateX(2px);
 }
 
+/* Horizontal Chart Navigation Bar (at bottom) */
+.chart-nav-bar {
+  background: #f8f9fa;
+  border-top: 1px solid #e9ecef;
+  padding: 12px 20px;
+}
+
+.chart-nav-buttons-horizontal {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.chart-nav-btn-sm {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.chart-nav-btn-sm:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+}
+
+.chart-nav-btn-sm:active {
+  transform: translateY(0);
+}
+
 /* Confirmation Card Styles */
 .confirmation-card {
   background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
