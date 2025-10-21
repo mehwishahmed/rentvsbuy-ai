@@ -381,7 +381,15 @@ function shouldShowChart(aiResponse: string): string | null {
           lowerContent.includes('use local') ||
           lowerContent.includes('use that data') ||
           lowerContent === 'yes' || lowerContent === 'yeah' || lowerContent === 'sure') {
-        // User wants to use local data via text
+        // Add user message first
+        const userMessage: Message = {
+          id: Date.now().toString(),
+          role: 'user',
+          content
+        };
+        setMessages(prev => [...prev, userMessage]);
+        
+        // Then trigger the action
         handleUseLocalData();
         return;
       }
@@ -393,7 +401,15 @@ function shouldShowChart(aiResponse: string): string | null {
           lowerContent.includes('custom') ||
           (lowerContent.includes('no') && (lowerContent.includes('enter') || lowerContent.includes('own'))) ||
           lowerContent === 'no') {
-        // User wants to enter their own data via text
+        // Add user message first
+        const userMessage: Message = {
+          id: Date.now().toString(),
+          role: 'user',
+          content
+        };
+        setMessages(prev => [...prev, userMessage]);
+        
+        // Then trigger the action
         handleKeepMyData();
         return;
       }
