@@ -724,11 +724,13 @@ body {
   transform: translateY(0);
 }
 
-/* Floating "Bottom Line?" Button */
+/* Floating "Bottom Line?" Button - Sticky on chat side */
 .bottom-line-trigger {
-  position: fixed;
-  bottom: 80px;
-  right: 30px;
+  position: sticky;
+  top: 20px;
+  float: right;
+  margin-right: 20px;
+  margin-top: 20px;
   background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
   color: white;
   border: none;
@@ -741,6 +743,7 @@ body {
   transition: all 0.3s ease;
   z-index: 1000;
   animation: pulse 2s infinite;
+  max-width: fit-content;
 }
 
 .bottom-line-trigger:hover {
@@ -860,6 +863,35 @@ body {
 }
 
 .insights-modal .risk-badge {
+  color: white;
+}
+
+.insights-modal .risk-badge-container {
+  margin-bottom: 16px;
+}
+
+.insights-modal .risk-badge {
+  display: inline-block;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.insights-modal .risk-badge.risk-low {
+  background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
+  color: white;
+}
+
+.insights-modal .risk-badge.risk-medium {
+  background: linear-gradient(135deg, #ed8936 0%, #dd6b20 100%);
+  color: white;
+}
+
+.insights-modal .risk-badge.risk-high {
+  background: linear-gradient(135deg, #f56565 0%, #e53e3e 100%);
   color: white;
 }
 
