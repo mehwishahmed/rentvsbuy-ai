@@ -371,6 +371,34 @@ function shouldShowChart(aiResponse: string): string | null {
 }
 
   const handleSendMessage = async (content: string) => {
+    // Check if user is responding to ZIP code choice via text
+    if (showLocationCard && locationData && !isLocationLocked) {
+      const lowerContent = content.toLowerCase();
+      
+      // Detect "use local data" intent
+      if ((lowerContent.includes('use') && (lowerContent.includes('those') || lowerContent.includes('local') || lowerContent.includes('zip') || lowerContent.includes('that'))) ||
+          lowerContent.includes('use those') ||
+          lowerContent.includes('use local') ||
+          lowerContent.includes('use that data') ||
+          lowerContent === 'yes' || lowerContent === 'yeah' || lowerContent === 'sure') {
+        // User wants to use local data via text
+        handleUseLocalData();
+        return;
+      }
+      
+      // Detect "keep my numbers" intent
+      if ((lowerContent.includes('my') && (lowerContent.includes('own') || lowerContent.includes('numbers'))) ||
+          lowerContent.includes('enter my') ||
+          lowerContent.includes('keep my') ||
+          lowerContent.includes('custom') ||
+          (lowerContent.includes('no') && (lowerContent.includes('enter') || lowerContent.includes('own'))) ||
+          lowerContent === 'no') {
+        // User wants to enter their own data via text
+        handleKeepMyData();
+        return;
+      }
+    }
+    
     // Add user message
     const userMessage: Message = {
       id: Date.now().toString(),
