@@ -42,6 +42,7 @@ body {
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
+  gap: 20px;
 }
 
 .chat-container {
@@ -629,14 +630,15 @@ body {
 
 /* Chart Navigation Section */
 .chart-nav-section {
-  margin-top: 20px;
-  padding-top: 20px;
-  border-top: 1px solid rgba(255, 255, 255, 0.2);
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 16px;
+  padding: 24px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
 }
 
 .chart-nav-section h4 {
   color: white;
-  font-size: 16px;
+  font-size: 18px;
   font-weight: 600;
   margin: 0 0 16px 0;
 }

@@ -639,10 +639,12 @@ const handleChipClick = (message: string) => {
   
   return (
     <div className="app-layout">
-      {/* Insights Sidebar - only show after user views first chart */}
-      {insights && hasViewedChart && (
+      {/* Sidebar with insights and chart buttons */}
+      {chartsReady && (
         <div className="insights-sidebar">
-          <div className="insights-summary">
+          {/* Insights Summary - only show after first chart viewed */}
+          {insights && hasViewedChart && (
+            <div className="insights-summary">
             <div className="insights-header">
               <h3>📊 Quick Summary</h3>
               <span className="insights-subtitle">Based on 30-year projection</span>
@@ -682,9 +684,10 @@ const handleChipClick = (message: string) => {
                 </div>
               </div>
             </div>
-          </div>
+            </div>
+          )}
           
-          {/* Chart Navigation Buttons */}
+          {/* Chart Navigation Buttons - always visible when charts ready */}
           <div className="chart-nav-section">
             <h4>📊 View Charts</h4>
             <div className="chart-nav-buttons">
