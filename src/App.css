@@ -32,14 +32,15 @@ body {
 .app-layout {
   display: flex;
   justify-content: center;
-  align-items: center;
+  align-items: flex-start;
   width: 100%;
-  max-width: 1200px;
   height: 95vh;
+  padding: 20px;
 }
 
 .chat-container {
   width: 100%;
+  max-width: 1000px;
   display: flex;
   flex-direction: column;
   background: white;
