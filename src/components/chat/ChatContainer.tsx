@@ -887,9 +887,6 @@ Restart
               <div className="insights-description">
                 <p>Want quick numbers? Here are the key stats based on your scenario:</p>
               </div>
-              <div className="risk-badge-container">
-                <span className={`risk-badge risk-${insights.risk.toLowerCase()}`}>{insights.risk} Risk</span>
-              </div>
               
               <div className="insights-grid">
                 <div className="insight-card primary">
@@ -912,13 +909,23 @@ Restart
                       ? 'Buying costs more monthly' 
                       : 'Renting costs more monthly'}
                   </div>
-      </div>
+                </div>
       
                 <div className="insight-card">
                   <div className="insight-label">Break-Even Point</div>
                   <div className="insight-value">Year {insights.breakEvenYear}</div>
                   <div className="insight-detail">
                     When buying starts paying off
+                  </div>
+                </div>
+                
+                <div className="insight-card">
+                  <div className="insight-label">Risk Level</div>
+                  <div className="insight-value">
+                    <span className={`risk-badge risk-${insights.risk.toLowerCase()}`}>{insights.risk} Risk</span>
+                  </div>
+                  <div className="insight-detail">
+                    Based on market volatility
                   </div>
                 </div>
               </div>

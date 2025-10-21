@@ -955,6 +955,11 @@ body {
 
 .insights-modal .risk-badge {
   color: white;
+  display: inline-block;
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
 }
 
 .insights-modal .risk-badge-container {
