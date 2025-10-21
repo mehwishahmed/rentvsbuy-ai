@@ -724,29 +724,85 @@ body {
   transform: translateY(0);
 }
 
-/* Floating "Bottom Line?" Button - Small and subtle */
+/* Floating "Bottom Line?" Button - Attention-grabbing */
 .bottom-line-trigger {
   position: fixed;
   bottom: 20px;
   right: 20px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
   color: white;
   border: none;
-  padding: 8px 16px;
-  border-radius: 20px;
-  font-size: 13px;
-  font-weight: 600;
+  padding: 10px 18px;
+  border-radius: 25px;
+  font-size: 14px;
+  font-weight: 700;
   cursor: pointer;
-  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+  box-shadow: 0 6px 20px rgba(245, 87, 108, 0.4);
   transition: all 0.3s ease;
   z-index: 1000;
-  opacity: 0.9;
+  animation: attentionPulse 3s infinite;
+  border: 2px solid rgba(255, 255, 255, 0.3);
 }
 
 .bottom-line-trigger:hover {
-  opacity: 1;
-  transform: translateY(-2px);
-  box-shadow: 0 6px 16px rgba(102, 126, 234, 0.4);
+  transform: translateY(-3px) scale(1.05);
+  box-shadow: 0 8px 25px rgba(245, 87, 108, 0.6);
+  animation: none;
+}
+
+@keyframes attentionPulse {
+  0%, 100% {
+    box-shadow: 0 6px 20px rgba(245, 87, 108, 0.4);
+    transform: scale(1);
+  }
+  50% {
+    box-shadow: 0 8px 30px rgba(245, 87, 108, 0.7);
+    transform: scale(1.02);
+  }
+}
+
+/* Bottom Line Hint Tooltip */
+.bottom-line-hint {
+  position: absolute;
+  bottom: 100%;
+  right: 0;
+  margin-bottom: 10px;
+  background: #2d3748;
+  color: white;
+  padding: 12px 16px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  animation: hintFadeIn 0.3s ease-out;
+  z-index: 1001;
+}
+
+.hint-arrow {
+  position: absolute;
+  top: 100%;
+  right: 20px;
+  width: 0;
+  height: 0;
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-top: 6px solid #2d3748;
+}
+
+.hint-text {
+  position: relative;
+}
+
+@keyframes hintFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .bottom-line-trigger:active {

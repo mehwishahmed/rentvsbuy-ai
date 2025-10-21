@@ -86,6 +86,9 @@ const [chartsReady, setChartsReady] = useState(false);
   
   // Ref for scrolling to charts
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  
+  // Show hint for bottom line button after user has viewed a chart
+  const [showBottomLineHint, setShowBottomLineHint] = useState(false);
   const [monthlyCosts, setMonthlyCosts] = useState<{
     buying: any;
     renting: any;
@@ -460,6 +463,13 @@ function shouldShowChart(aiResponse: string): string | null {
           block: 'end'
         });
       }, 300);
+      
+      // Show hint for bottom line button after viewing a chart
+      setTimeout(() => {
+        setShowBottomLineHint(true);
+        // Hide hint after 5 seconds
+        setTimeout(() => setShowBottomLineHint(false), 5000);
+      }, 2000);
     } else {
       // Normal AI response without chart
       assistantMessage = {
@@ -649,13 +659,25 @@ const handleChipClick = (message: string) => {
     <div className="app-layout">
       {/* Floating "Bottom Line?" Button - only show when charts are ready */}
       {chartsReady && insights && (
-        <button 
-          className="bottom-line-trigger"
-          onClick={() => setShowInsightsModal(true)}
-          title="See the bottom line summary"
-        >
-          💡 Bottom Line?
-        </button>
+        <div style={{ position: 'relative' }}>
+          <button 
+            className="bottom-line-trigger"
+            onClick={() => setShowInsightsModal(true)}
+            title="See the bottom line summary"
+          >
+            💡 Bottom Line?
+          </button>
+          
+          {/* Hint tooltip */}
+          {showBottomLineHint && (
+            <div className="bottom-line-hint">
+              <div className="hint-arrow"></div>
+              <div className="hint-text">
+                Click here for a quick summary!
+              </div>
+            </div>
+          )}
+        </div>
       )}
       
     <div className="chat-container">
