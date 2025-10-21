@@ -340,24 +340,16 @@ const [chartsReady, setChartsReady] = useState(false);
 
   const handleKeepMyData = () => {
     if (locationData) {
-      // Lock the card in reference mode (will show user's custom values once provided)
+      // Lock the card in reference mode and show it immediately with blanks
       setIsLocationLocked(true);
       setUsingZipData(false);
-      setShowLocationCard(false); // Hide for now, will reappear once user provides data
+      setShowLocationCard(false); // Hide the decision card
       
-      // Add AI message with preset assumptions and ask for their numbers
+      // Add AI message referencing the box
       const aiMessage: Message = {
         id: Date.now().toString(),
         role: 'assistant',
-        content: `Got it! For your reference, I'll be using these default assumptions:
-
-📍 **Default Assumptions (National Averages):**
-• Property tax: 1.0%
-• Rent growth: 3.5%/year
-• Home appreciation: 3.0%/year
-• Investment return: 7.0%/year
-
-Now, what home price and monthly rent are you working with?`
+        content: `Got it! For reference, the default assumptions are shown in the box on the top right. Now, what home price and monthly rent are you working with?`
       };
       setMessages(prev => [...prev, aiMessage]);
     }
@@ -549,11 +541,6 @@ function shouldShowChart(aiResponse: string): string | null {
         })
       };
       setMessages(prev => [...prev, confirmationCard]);
-      
-      // Show reference box if user chose to keep their own data
-      if (isLocationLocked && !usingZipData) {
-        setShowLocationCard(true);
-      }
     }
     
     // Then add bot response (so it appears AFTER the card)
@@ -798,11 +785,11 @@ const handleChipClick = (message: string) => {
         </div>
       )}
       
-      {/* Reference Box: Show after user makes choice and data is complete */}
-      {isLocationLocked && chartsReady && (
+      {/* Reference Box: Show after user makes choice */}
+      {isLocationLocked && (
         <div className="reference-box">
           <div className="reference-box-header">
-            <h4>📊 Analysis Settings</h4>
+            <h4>📊 Your Inputs</h4>
           </div>
           <div className="reference-box-content">
             {usingZipData && locationData ? (
@@ -810,15 +797,24 @@ const handleChipClick = (message: string) => {
               <>
                 <div className="reference-item">
                   <span className="ref-label">🏠 Home:</span>
-                  <span className="ref-value">${userData.homePrice?.toLocaleString()} <small>({locationData.city})</small></span>
+                  <span className="ref-value">
+                    {userData.homePrice ? `$${userData.homePrice.toLocaleString()}` : '___'} 
+                    <small>({locationData.city})</small>
+                  </span>
                 </div>
                 <div className="reference-item">
                   <span className="ref-label">💵 Rent:</span>
-                  <span className="ref-value">${userData.monthlyRent?.toLocaleString()}/mo <small>({locationData.city})</small></span>
+                  <span className="ref-value">
+                    {userData.monthlyRent ? `$${userData.monthlyRent.toLocaleString()}/mo` : '___'} 
+                    <small>({locationData.city})</small>
+                  </span>
                 </div>
                 <div className="reference-item">
                   <span className="ref-label">💰 Down:</span>
-                  <span className="ref-value">{userData.downPaymentPercent}% <small>(you chose)</small></span>
+                  <span className="ref-value">
+                    {userData.downPaymentPercent ? `${userData.downPaymentPercent}%` : '___'} 
+                    <small>(you chose)</small>
+                  </span>
                 </div>
                 <div className="reference-item">
                   <span className="ref-label">🏛️ Tax:</span>
@@ -843,15 +839,24 @@ const handleChipClick = (message: string) => {
               <>
                 <div className="reference-item">
                   <span className="ref-label">🏠 Home:</span>
-                  <span className="ref-value">${userData.homePrice?.toLocaleString()} <small>(you chose)</small></span>
+                  <span className="ref-value">
+                    {userData.homePrice ? `$${userData.homePrice.toLocaleString()}` : '___'} 
+                    <small>(you chose)</small>
+                  </span>
                 </div>
                 <div className="reference-item">
                   <span className="ref-label">💵 Rent:</span>
-                  <span className="ref-value">${userData.monthlyRent?.toLocaleString()}/mo <small>(you chose)</small></span>
+                  <span className="ref-value">
+                    {userData.monthlyRent ? `$${userData.monthlyRent.toLocaleString()}/mo` : '___'} 
+                    <small>(you chose)</small>
+                  </span>
                 </div>
                 <div className="reference-item">
                   <span className="ref-label">💰 Down:</span>
-                  <span className="ref-value">{userData.downPaymentPercent}% <small>(you chose)</small></span>
+                  <span className="ref-value">
+                    {userData.downPaymentPercent ? `${userData.downPaymentPercent}%` : '___'} 
+                    <small>(you chose)</small>
+                  </span>
                 </div>
                 <div className="reference-item">
                   <span className="ref-label">🏛️ Tax:</span>
