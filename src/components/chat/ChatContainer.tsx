@@ -372,7 +372,8 @@ function shouldShowChart(aiResponse: string): string | null {
   if (lower.match(/here'?s your (updated |new )?monthly costs breakdown/)) return 'monthlyCost';
   if (lower.match(/here'?s your (updated |new )?total cost comparison/)) return 'totalCost';
   if (lower.match(/here'?s your (updated |new )?equity buildup/)) return 'equity';
-  if (lower.match(/here'?s your (updated |new )?rent growth/)) return 'rentGrowth';
+  // More flexible pattern for Rent Growth (with or without "chart", "comparison", etc.)
+  if (lower.match(/here'?s your (updated |new )?rent growth( chart| comparison)?/)) return 'rentGrowth';
   
   return null;
 }
