@@ -468,9 +468,9 @@ function shouldShowChart(aiResponse: string): string | null {
       setTimeout(() => {
         console.log('Showing bottom line hint from AI response');
         setShowBottomLineHint(true);
-        // Hide hint after 5 seconds
-        setTimeout(() => setShowBottomLineHint(false), 5000);
-      }, 2000);
+        // Hide hint after 8 seconds (longer duration)
+        setTimeout(() => setShowBottomLineHint(false), 8000);
+      }, 1500);
     } else {
       // Normal AI response without chart
       assistantMessage = {
@@ -514,9 +514,9 @@ const handleChipClick = (message: string) => {
     setTimeout(() => {
       console.log('Showing bottom line hint');
       setShowBottomLineHint(true);
-      // Hide hint after 5 seconds
-      setTimeout(() => setShowBottomLineHint(false), 5000);
-    }, 2000);
+      // Hide hint after 8 seconds (longer duration)
+      setTimeout(() => setShowBottomLineHint(false), 8000);
+    }, 1500);
 };
 
   const calculateAndShowChart = (data: UserData) => {
