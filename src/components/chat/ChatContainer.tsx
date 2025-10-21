@@ -930,7 +930,7 @@ Restart
           </div>
       </div>
       
-      <div className="messages-container" ref={messagesEndRef}>
+      <div className="messages-container">
         {messages.map(message => (
           <div key={message.id} data-message-id={message.id}>
             {/* Render confirmation card for system messages */}
