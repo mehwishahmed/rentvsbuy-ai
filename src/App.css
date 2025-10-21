@@ -773,17 +773,23 @@ body {
   border-radius: 10px;
   font-size: 14px;
   font-weight: 600;
-  white-space: nowrap;
+  white-space: normal;
+  text-align: center;
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
   animation: hintFadeIn 0.5s ease-out;
   z-index: 1001;
   border: 2px solid rgba(255, 255, 255, 0.2);
+  /* Ensure it stays within viewport */
+  max-width: 200px;
+  transform: translateX(-50%);
+  left: 50%;
 }
 
 .hint-arrow {
   position: absolute;
   top: 100%;
-  right: 20px;
+  left: 50%;
+  transform: translateX(-50%);
   width: 0;
   height: 0;
   border-left: 6px solid transparent;
