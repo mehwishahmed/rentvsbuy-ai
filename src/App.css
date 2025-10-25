@@ -125,8 +125,8 @@ button:hover {
 }
 
 .ref-input {
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.3);
   border-radius: 4px;
   padding: 6px 8px;
   color: white;
@@ -141,9 +141,9 @@ button:hover {
 
 .ref-input:focus {
   outline: none;
-  border-color: rgba(16, 185, 129, 0.5);
-  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2);
-  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(16, 185, 129, 0.8);
+  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.3);
+  background: rgba(0, 0, 0, 0.5);
 }
 
 .ref-input::placeholder {
