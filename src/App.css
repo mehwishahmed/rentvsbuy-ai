@@ -126,6 +126,8 @@ button:hover {
     sans-serif !important;
   backdrop-filter: blur(10px);
   transition: all 0.2s;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .ref-input:focus {
@@ -1133,6 +1135,7 @@ body {
   max-width: 280px;
   max-height: calc(100vh - 40px);
   overflow-y: auto;
+  overflow-x: hidden;
   z-index: 1001;
   border: 1px solid #e2e8f0;
   animation: referenceBoxFadeIn 0.4s ease-out;
