@@ -1198,7 +1198,7 @@ const handleChipClick = (message: string) => {
                 className="edit-values-btn"
                 onClick={handleEditValues}
               >
-                ✏️ Edit Values
+                Edit Values
               </button>
             ) : (
               <div className="edit-actions">
@@ -1206,13 +1206,13 @@ const handleChipClick = (message: string) => {
                   className="save-edit-btn"
                   onClick={handleSaveEdit}
                 >
-                  💾 Save Changes
+                  Save Changes
                 </button>
                 <button 
                   className="cancel-edit-btn"
                   onClick={handleCancelEdit}
                 >
-                  ❌ Cancel
+                  Cancel
                 </button>
               </div>
             )}
