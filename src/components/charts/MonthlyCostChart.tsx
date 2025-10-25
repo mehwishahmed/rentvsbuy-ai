@@ -24,7 +24,7 @@ export function MonthlyCostChart({ buyingCosts, rentingCosts }: MonthlyCostChart
     {
       name: 'Buying',
       total: Math.round(buyingCosts.total),
-      color: '#667eea'
+      color: '#1e293b'
     },
     {
       name: 'Renting',
@@ -80,7 +80,7 @@ export function MonthlyCostChart({ buyingCosts, rentingCosts }: MonthlyCostChart
       {/* Breakdown sections */}
       <div className="cost-breakdown">
         <div className="breakdown-column">
-          <h4 style={{ color: '#667eea' }}>Buying Breakdown</h4>
+          <h4 style={{ color: '#1e293b' }}>Buying Breakdown</h4>
           {buyingBreakdown.map(item => (
             <div key={item.label} className="breakdown-item">
               <span>{item.label}:</span>

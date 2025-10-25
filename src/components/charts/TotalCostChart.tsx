@@ -51,7 +51,7 @@ export function TotalCostChart({
       <div className="breakeven-callout" style={{ 
         background: winner === 'Buying' 
           ? 'linear-gradient(135deg, #48bb78 0%, #38a169 100%)' 
-          : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+          : 'linear-gradient(135deg, #1e293b 0%, #064e3b 100%)'
       }}>
         <p>🏆 <strong>{winner} saves you ${savings.toLocaleString()} over {timelineYears} years!</strong></p>
         <p>The net cost of {winner.toLowerCase()} is ${savings.toLocaleString()} lower.</p>      </div>
@@ -73,11 +73,11 @@ export function TotalCostChart({
           />
           <Tooltip 
             formatter={(value: number) => `$${value.toLocaleString()}`}
-            contentStyle={{ backgroundColor: 'white', border: '2px solid #667eea', borderRadius: '8px' }}
+            contentStyle={{ backgroundColor: 'white', border: '2px solid #1e293b', borderRadius: '8px' }}
           />
           <Legend />
           <Bar dataKey="netCost" name={`Net Cost (after ${timelineYears} years)`} radius={[8, 8, 0, 0]}>
-            <Cell fill="#667eea" />
+            <Cell fill="#1e293b" />
             <Cell fill="#f56565" />
           </Bar>
         </BarChart>
@@ -86,7 +86,7 @@ export function TotalCostChart({
       <div style={{ marginTop: '20px', padding: '20px', background: '#f7fafc', borderRadius: '12px' }}>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', textAlign: 'center' }}>
           <div>
-            <h4 style={{ color: '#667eea', marginBottom: '8px' }}>💰 Buying Breakdown</h4>
+            <h4 style={{ color: '#1e293b', marginBottom: '8px' }}>💰 Buying Breakdown</h4>
             <p style={{ color: 'black' }}><strong>Total Spent:</strong> ${totalBuyingCosts.toLocaleString()}</p>
             <p style={{ color: 'black' }}><strong>Home Value:</strong> ${finalHomeValue.toLocaleString()}</p>
             <p style={{ color: 'black' }}><strong>Net Cost:</strong> ${Math.round(buyingNetCost).toLocaleString()}</p>

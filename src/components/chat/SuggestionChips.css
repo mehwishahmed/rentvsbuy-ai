@@ -23,9 +23,9 @@
   .chip {
     padding: 10px 16px;
     background: white;
-    border: 2px solid #667eea;
+    border: 2px solid #1e293b;
     border-radius: 20px;
-    color: #667eea;
+    color: #1e293b;
     font-size: 14px;
     font-weight: 500;
     cursor: pointer;
@@ -33,10 +33,10 @@
   }
   
   .chip:hover {
-    background: #667eea;
+    background: #1e293b;
     color: white;
     transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+    box-shadow: 0 4px 12px rgba(30, 41, 59, 0.3);
   }
   
   .chip:active {

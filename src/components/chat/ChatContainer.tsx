@@ -59,7 +59,12 @@ export function ChatContainer() {
     {
       id: '1',
       role: 'assistant',
-      content: "Hi! I'm here to help you figure out whether buying or renting makes more financial sense for you. To get started, tell me: what's the home price you're considering and your current monthly rent?\n\n💡 **Tip:** You can also just type in a ZIP code (like 90210) and I'll use local market data for that area!"
+        content: "Welcome! I'm your AI-powered financial advisor, here to help you make the smartest decision between buying and renting. I'll analyze your specific situation and show you exactly how your money will grow over time."
+      },
+      {
+        id: '2',
+        role: 'assistant',
+        content: "Let's get started! What's the home price you're considering and your current monthly rent?\n\nPro tip: You can also enter a ZIP code (like 90210) and I'll pull real local market data for that area!"
     }
   ]);
   
@@ -285,29 +290,16 @@ const [chartsReady, setChartsReady] = useState(false);
 
   const handleUseLocalData = () => {
     if (locationData) {
-      // CRITICAL: Create completely fresh userData with ONLY ZIP values
-      // Clear any previous custom values to avoid showing stale data
-      const newUserData: UserData = {
-        homePrice: locationData.medianHomePrice,
-        monthlyRent: locationData.averageRent,
-        downPaymentPercent: null, // Always ask for down payment with new ZIP
-        timeHorizonYears: null
-      };
-      
-      console.log('🔄 handleUseLocalData - Setting userData to:', newUserData);
-      setUserData(newUserData);
-      
-      // Lock the card in reference mode
-      setIsLocationLocked(true);
-      setUsingZipData(true);
-      
-      // Add AI message asking for down payment
-      const aiMessage: Message = {
+      // Add confirmation message first (don't set data yet)
+      const confirmationMessage: Message = {
         id: Date.now().toString(),
         role: 'assistant',
-        content: `Perfect! I've updated your scenario with ${locationData.city}, ${locationData.state} market data. Last thing—what down payment percentage are you thinking?`
+        content: `Great! I found local market data for ${locationData.city}, ${locationData.state}:\n\n🏠 **Home Price:** $${locationData.medianHomePrice.toLocaleString()}\n💵 **Monthly Rent:** $${locationData.averageRent.toLocaleString()}\n🏛️ **Property Tax:** ${(locationData.propertyTaxRate * 100).toFixed(2)}%\n📈 **Rent Growth:** ${(locationData.rentGrowthRate * 100).toFixed(1)}%/year\n🏘️ **Home Appreciation:** ${(locationData.homeAppreciationRate * 100).toFixed(1)}%/year\n\nDo you want to use these values? If yes, I'll just need your down payment percentage and timeline!`
       };
-      setMessages(prev => [...prev, aiMessage]);
+      setMessages(prev => [...prev, confirmationMessage]);
+      
+      // Hide the location card so user can respond via chat
+      setShowLocationCard(false);
     }
   };
 
@@ -349,6 +341,55 @@ function shouldShowChart(aiResponse: string): string | null {
 }
 
   const handleSendMessage = async (content: string) => {
+    // PATH 15: Check if user is confirming ZIP code data usage
+    if (locationData && !isLocationLocked) {
+      const lowerContent = content.toLowerCase();
+      
+      // Check if user is confirming they want to use the ZIP data
+      if (lowerContent.includes('yes') || lowerContent.includes('yeah') || lowerContent.includes('sure') || 
+          lowerContent.includes('use these') || lowerContent.includes('use those') || 
+          lowerContent.includes('use the data') || lowerContent.includes('confirm')) {
+        
+        // Set the ZIP data and lock it
+        const newUserData: UserData = {
+          homePrice: locationData.medianHomePrice,
+          monthlyRent: locationData.averageRent,
+          downPaymentPercent: null,
+          timeHorizonYears: null
+        };
+        
+        setUserData(newUserData);
+        setIsLocationLocked(true);
+        setUsingZipData(true);
+        
+        // Add AI message asking for down payment and timeline
+        const aiMessage: Message = {
+          id: Date.now().toString(),
+          role: 'assistant',
+          content: `Perfect! I'll use the ${locationData.city}, ${locationData.state} market data. Now I just need two more details:\n\n1. What down payment percentage are you thinking? (e.g., 10%, 20%)\n2. How long do you plan to stay in this home? (e.g., 3, 5, 10 years)`
+        };
+        setMessages(prev => [...prev, { id: Date.now().toString(), role: 'user', content }, aiMessage]);
+        return;
+      }
+      
+      // Check if user wants to decline the ZIP data
+      if (lowerContent.includes('no') || lowerContent.includes('nope') || lowerContent.includes('keep my') || 
+          lowerContent.includes('use my own') || lowerContent.includes('custom')) {
+        
+        // Clear location data and continue with custom input
+        setLocationData(null);
+        setShowLocationCard(false);
+        
+        const declineMessage: Message = {
+          id: Date.now().toString(),
+          role: 'assistant',
+          content: "No problem! Let's use your own numbers instead. What home price and monthly rent are you working with?"
+        };
+        setMessages(prev => [...prev, { id: Date.now().toString(), role: 'user', content }, declineMessage]);
+        return;
+      }
+    }
+    
     // PATH 14: Check if user is changing their mind after making a choice
     if (isLocationLocked && locationData) {
       const lowerContent = content.toLowerCase();
@@ -1042,14 +1083,14 @@ const handleChipClick = (message: string) => {
       
     <div className="chat-container">
       <div className="chat-header">
-        <h1>RentVsBuy.ai</h1>
+        <h1 className="app-title">RentVsBuy.ai</h1>
           <div className="header-buttons">
             <button 
               className="save-button"
               onClick={handleSaveChat}
               title="Save current chat"
             >
-              💾 Save Chat
+              Save Chat
             </button>
             <button 
               className="restart-button"
@@ -1333,6 +1374,7 @@ function extractUserData(message: string, currentData: UserData): { userData: Us
   
   const allNumbers = extractAllNumbers(messageWithoutZip);
   
+  
   // If only one number, use context clues
   if (allNumbers.length === 1) {
     const num = allNumbers[0];
@@ -1349,15 +1391,30 @@ function extractUserData(message: string, currentData: UserData): { userData: Us
     else if ((isNewData || !newData.downPaymentPercent) && (num >= 1 && num <= 100 || lowerMessage.includes('%') || lowerMessage.includes('down'))) {
       newData.downPaymentPercent = num;
     }
-    // Time horizon (years, 1-30 range or has keywords) - ONLY if down payment is already set
-    else if ((isNewData || !newData.timeHorizonYears) && (num >= 1 && num <= 30 || lowerMessage.includes('year') || lowerMessage.includes('stay') || lowerMessage.includes('plan')) && newData.downPaymentPercent) {
-      newData.timeHorizonYears = num;
+    // Time horizon (years, 1-30 range or has keywords) - Check if message contains both down payment and timeline
+    else if ((isNewData || !newData.timeHorizonYears) && (num >= 1 && num <= 30 || lowerMessage.includes('year') || lowerMessage.includes('stay') || lowerMessage.includes('plan'))) {
+      // If message contains both % and year keywords, or if down payment is already set, assign timeline
+      if (lowerMessage.includes('%') && (lowerMessage.includes('year') || lowerMessage.includes('years') || lowerMessage.includes('yr')) || newData.downPaymentPercent) {
+        newData.timeHorizonYears = num;
+      }
     }
   }
   
   // If multiple numbers, assign by size
   else if (allNumbers.length >= 2) {
     allNumbers.sort((a, b) => b - a); // Sort largest to smallest
+    
+    // Special case: If we have 2 small numbers (1-100) and message contains both % and years
+    if (allNumbers.length === 2 && allNumbers.every(n => n >= 1 && n <= 100) && 
+        lowerMessage.includes('%') && (lowerMessage.includes('year') || lowerMessage.includes('years') || lowerMessage.includes('yr'))) {
+      
+      // Both numbers are small, assign based on context
+      // If message has both % and years, assign both values
+      newData.downPaymentPercent = allNumbers[0];
+      newData.timeHorizonYears = allNumbers[1];
+      
+      return { userData: newData, locationData };
+    }
     
     // Detect if all 3 values are present - if so, it's a complete new scenario
     const hasLargeNumber = allNumbers.some(n => n > 50000);
@@ -1391,6 +1448,7 @@ function extractUserData(message: string, currentData: UserData): { userData: Us
       newData.timeHorizonYears = timeNumber;
     }
   }
+  
   
   return { userData: newData, locationData };
 }
