@@ -28,11 +28,11 @@ export function RentGrowthChart({ data, monthlyMortgage }: RentGrowthChartProps)
   
   return (
     <div className="chart-container">
-      <h3 className="chart-title">Rent Growth vs Fixed Mortgage Over 30 Years</h3>
+      <h3 className="chart-title">Rent Growth vs Fixed Mortgage Over {Math.ceil(data.length / 12)} Years</h3>
       
       <div style={{ marginBottom: '16px', padding: '16px', background: '#fff4e6', borderRadius: '8px', border: '2px solid #f59e0b' }}>
         <p style={{ margin: 0, fontSize: '16px', color: '#2d3748' }}>
-          <strong>Rent grows {percentIncrease}%</strong> over 30 years 
+          <strong>Rent grows {percentIncrease}%</strong> over {Math.ceil(data.length / 12)} years 
           (from <strong>${chartData[0].rent.toLocaleString()}/mo</strong> to <strong>${finalRent.toLocaleString()}/mo</strong>), 
           while your mortgage stays fixed at <strong>${monthlyMortgage.toLocaleString()}/mo</strong>
         </p>
@@ -84,7 +84,7 @@ export function RentGrowthChart({ data, monthlyMortgage }: RentGrowthChartProps)
         <h4 style={{ marginBottom: '12px', color: '#2d3748' }}>What This Shows:</h4>
         <p style={{ marginBottom: '8px', lineHeight: '1.6', color: '#2d3748' }}>
           This illustrates the <strong>"rent trap"</strong> - rent increases every year (typically 3-4%), 
-          while your mortgage payment stays the same for 30 years.
+          while your mortgage payment stays the same for {Math.ceil(data.length / 12)} years.
         </p>
         <ul style={{ marginLeft: '20px', lineHeight: '1.8', color: '#2d3748' }}>
           <li><strong>Red line (Rent):</strong> Climbs steadily due to inflation</li>

@@ -9,6 +9,7 @@ export interface ScenarioInputs {
     downPaymentPercent: number;         // e.g., 20 (means 20%)
     interestRate: number;               // e.g., 7.0 (means 7%)
     loanTermYears: number;              // e.g., 30
+    timeHorizonYears: number;           // e.g., 7 (how long user plans to stay)
     
     // Renting info
     monthlyRent: number;                // e.g., 2800

@@ -132,7 +132,7 @@ export function calculateBuyingCosts(inputs: ScenarioInputs): {
 
 export function calculateRentingCosts(
     inputs: ScenarioInputs,
-    month: number // Which month (1-360) we're calculating for
+    month: number // Which month (1 to user's timeline) we're calculating for
   ): {
     monthlyRent: number;
     insurance: number;
@@ -160,7 +160,7 @@ export function calculateRentingCosts(
   }
 
 // ===================================
-// FUNCTION #5: Calculate Net Worth Comparison (Full 360 months)
+// FUNCTION #5: Calculate Net Worth Comparison (User's timeline)
 // ===================================
 export function calculateNetWorthComparison(inputs: ScenarioInputs): MonthlySnapshot[] {
     const snapshots: MonthlySnapshot[] = [];
@@ -170,7 +170,7 @@ export function calculateNetWorthComparison(inputs: ScenarioInputs): MonthlySnap
     const amortization = generateAmortizationSchedule(
       loanAmount,
       inputs.interestRate,
-      inputs.loanTermYears
+      inputs.timeHorizonYears
     );
     
     const buyingCosts = calculateBuyingCosts(inputs);
@@ -179,15 +179,31 @@ export function calculateNetWorthComparison(inputs: ScenarioInputs): MonthlySnap
     let investedDownPayment = downPaymentAmount;
     const monthlyInvestmentReturn = inputs.investmentReturnRate / 100 / 12;
     
-    // Loop through all 360 months
-    for (let month = 1; month <= 360; month++) {
+    // Loop through the user's timeline (convert years to months)
+    const totalMonths = inputs.timeHorizonYears * 12;
+    for (let month = 1; month <= totalMonths; month++) {
       const amortMonth = amortization[month - 1];
       
       // === BUYING SCENARIO ===
       const yearsElapsed = (month - 1) / 12;
       const homeValue = inputs.homePrice * Math.pow(1 + inputs.homeAppreciationRate / 100, yearsElapsed);
-      const homeEquity = homeValue - amortMonth.remainingBalance;
+      
+      // Calculate selling costs (6% realtor + 2% closing = 8% total)
+      // Only apply when you actually sell (final month of timeline)
+      const isFinalMonth = month === totalMonths;
+      const sellingCosts = isFinalMonth ? homeValue * 0.08 : 0;
+      const homeEquity = homeValue - amortMonth.remainingBalance - sellingCosts;
       const buyerNetWorth = homeEquity;
+      
+      // Debug logging for 2-year scenario
+      if (inputs.timeHorizonYears === 2 && isFinalMonth) {
+        console.log('🔍 SELLING COSTS DEBUG:');
+        console.log('Home Value:', homeValue);
+        console.log('Selling Costs (8%):', sellingCosts);
+        console.log('Remaining Balance:', amortMonth.remainingBalance);
+        console.log('Home Equity (after selling costs):', homeEquity);
+        console.log('Buyer Net Worth:', buyerNetWorth);
+      }
       
       // === RENTING SCENARIO ===
       const rentingCosts = calculateRentingCosts(inputs, month);

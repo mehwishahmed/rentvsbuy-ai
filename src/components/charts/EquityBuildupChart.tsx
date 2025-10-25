@@ -30,11 +30,11 @@ export function EquityBuildupChart({ data }: EquityBuildupChartProps) {
   
   return (
     <div className="chart-container">
-      <h3 className="chart-title">Home Equity Buildup Over 30 Years</h3>
+      <h3 className="chart-title">Home Equity Buildup Over {Math.ceil(data.length / 12)} Years</h3>
       
       <div style={{ marginBottom: '16px', padding: '16px', background: '#f0f4ff', borderRadius: '8px', border: '2px solid #667eea' }}>
         <p style={{ margin: 0, fontSize: '16px', color: '#2d3748' }}>
-          <strong>After 30 years:</strong> You'll have <strong>${finalEquity.toLocaleString()}</strong> in equity 
+          <strong>After {Math.ceil(data.length / 12)} years:</strong> You'll have <strong>${finalEquity.toLocaleString()}</strong> in equity 
           ({finalPercent}% of your home's value)
         </p>
       </div>

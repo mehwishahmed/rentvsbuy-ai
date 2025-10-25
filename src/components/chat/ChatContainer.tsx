@@ -49,6 +49,7 @@ interface UserData {
   homePrice: number | null;
   monthlyRent: number | null;
   downPaymentPercent: number | null;
+  timeHorizonYears: number | null;
 }
 
 export function ChatContainer() {
@@ -63,7 +64,8 @@ export function ChatContainer() {
   const [userData, setUserData] = useState<UserData>({
     homePrice: null,
     monthlyRent: null,
-    downPaymentPercent: null
+    downPaymentPercent: null,
+    timeHorizonYears: null
   });
   
   const [chartData, setChartData] = useState<MonthlySnapshot[] | null>(null);
@@ -78,7 +80,6 @@ export function ChatContainer() {
 
 // Track if charts are ready to show (data calculated)
 const [chartsReady, setChartsReady] = useState(false);
-  const [showInsightsModal, setShowInsightsModal] = useState(false); // Modal visibility
   const [isLoading, setIsLoading] = useState(false);
   const [saveProgress, setSaveProgress] = useState<number | null>(null); // Track PDF save progress
   
@@ -108,44 +109,6 @@ const [chartsReady, setChartsReady] = useState(false);
     finalInvestmentValue: number;
   } | null>(null);
   
-  // Calculate key insights for summary
-  const getKeyInsights = () => {
-    if (!chartData || !monthlyCosts || !totalCostData || !userData.homePrice || !userData.monthlyRent || !userData.downPaymentPercent) {
-      return null;
-    }
-
-    const netWorthDiff = totalCostData.buyerFinalNetWorth - totalCostData.renterFinalNetWorth;
-    const winner = netWorthDiff > 0 ? 'buying' : 'renting';
-    const savings = Math.abs(netWorthDiff);
-    
-    const monthlyDiff = monthlyCosts.buying.total - monthlyCosts.renting.total;
-    
-    // Find break-even point (where buying net worth exceeds renting)
-    let breakEvenYear = 30;
-    for (let i = 0; i < chartData.length; i++) {
-      if (chartData[i].buyerNetWorth > chartData[i].renterNetWorth) {
-        breakEvenYear = Math.floor(i / 12) + 1;
-        break;
-      }
-    }
-
-    // Risk assessment based on down payment
-    let risk = 'Low';
-    if (userData.downPaymentPercent < 10) risk = 'High';
-    else if (userData.downPaymentPercent < 20) risk = 'Medium';
-
-    return {
-      winner,
-      savings,
-      monthlyDiff,
-      breakEvenYear,
-      risk,
-      buyingMonthly: monthlyCosts.buying.total,
-      rentingMonthly: monthlyCosts.renting.total
-    };
-  };
-
-  const insights = getKeyInsights();
   
   // Handle save chat as PDF
   const handleSaveChat = async () => {
@@ -294,7 +257,8 @@ const [chartsReady, setChartsReady] = useState(false);
     setUserData({
       homePrice: null,
       monthlyRent: null,
-      downPaymentPercent: null
+      downPaymentPercent: null,
+      timeHorizonYears: null
     });
     setChartData(null);
     setVisibleCharts({
@@ -305,7 +269,6 @@ const [chartsReady, setChartsReady] = useState(false);
       rentGrowth: false
     });
     setChartsReady(false);
-    setShowInsightsModal(false);
     setMonthlyCosts(null);
     setTotalCostData(null);
     setShowRestartModal(false);
@@ -322,7 +285,8 @@ const [chartsReady, setChartsReady] = useState(false);
       const newUserData: UserData = {
         homePrice: locationData.medianHomePrice,
         monthlyRent: locationData.averageRent,
-        downPaymentPercent: null // Always ask for down payment with new ZIP
+        downPaymentPercent: null, // Always ask for down payment with new ZIP
+        timeHorizonYears: null
       };
       
       console.log('🔄 handleUseLocalData - Setting userData to:', newUserData);
@@ -389,7 +353,7 @@ function shouldShowChart(aiResponse: string): string | null {
         setIsLocationLocked(false);
         setUsingZipData(false);
         setLocationData(null);
-        setUserData({ homePrice: null, monthlyRent: null, downPaymentPercent: null });
+        setUserData({ homePrice: null, monthlyRent: null, downPaymentPercent: null, timeHorizonYears: null });
         
         const changeMessage: Message = {
           id: Date.now().toString(),
@@ -407,7 +371,8 @@ function shouldShowChart(aiResponse: string): string | null {
         setUserData({
           homePrice: locationData.medianHomePrice,
           monthlyRent: locationData.averageRent,
-          downPaymentPercent: null
+          downPaymentPercent: null,
+          timeHorizonYears: null
         });
         
         const changeMessage: Message = {
@@ -524,11 +489,12 @@ function shouldShowChart(aiResponse: string): string | null {
     setUserData(newUserData);
     
     // Check if we have all data and if it changed
-    const hasAllData = newUserData.homePrice && newUserData.monthlyRent && newUserData.downPaymentPercent;
+    const hasAllData = newUserData.homePrice && newUserData.monthlyRent && newUserData.downPaymentPercent && newUserData.timeHorizonYears;
     const dataChanged = 
       newUserData.homePrice !== userData.homePrice ||
       newUserData.monthlyRent !== userData.monthlyRent ||
-      newUserData.downPaymentPercent !== userData.downPaymentPercent;
+      newUserData.downPaymentPercent !== userData.downPaymentPercent ||
+      newUserData.timeHorizonYears !== userData.timeHorizonYears;
     
     // If data changed, we need to recalculate charts BEFORE showing them
     let freshChartData = chartData;
@@ -542,6 +508,7 @@ function shouldShowChart(aiResponse: string): string | null {
         downPaymentPercent: newUserData.downPaymentPercent!,
         interestRate: 7.0,
         loanTermYears: 30,
+        timeHorizonYears: newUserData.timeHorizonYears!,
         propertyTaxRate: 1.0,
         homeInsuranceAnnual: 1200,
         hoaMonthly: 150,
@@ -576,18 +543,18 @@ function shouldShowChart(aiResponse: string): string | null {
         }
       };
       
-      // Calculate total costs over 30 years
-      const month360 = snapshots[359]; // Last month (year 30)
+      // Calculate total costs over user's timeline
+      const finalMonth = snapshots[snapshots.length - 1]; // Last month of user's timeline
       const totalBuyingCosts = snapshots.reduce((sum, s) => sum + s.monthlyBuyingCosts, 0);
       const totalRentingCosts = snapshots.reduce((sum, s) => sum + s.monthlyRentingCosts, 0);
       
       freshTotalCostData = {
-        buyerFinalNetWorth: month360.buyerNetWorth,
-        renterFinalNetWorth: month360.renterNetWorth,
+        buyerFinalNetWorth: finalMonth.buyerNetWorth,
+        renterFinalNetWorth: finalMonth.renterNetWorth,
         totalBuyingCosts,
         totalRentingCosts,
-        finalHomeValue: month360.homeValue,
-        finalInvestmentValue: month360.investedDownPayment
+        finalHomeValue: finalMonth.homeValue,
+        finalInvestmentValue: finalMonth.investedDownPayment
       };
       
       // Update state
@@ -708,6 +675,7 @@ const handleChipClick = (message: string) => {
       monthlyRent: data.monthlyRent!,
       interestRate: 7.0,
       loanTermYears: 30,
+      timeHorizonYears: data.timeHorizonYears!,
       propertyTaxRate: propertyTaxRate,
       homeInsuranceAnnual: 1200,
       hoaMonthly: 150,
@@ -743,18 +711,18 @@ const handleChipClick = (message: string) => {
       }
     });
     
-    // Calculate total costs over 30 years
-    const month360 = snapshots[359]; // Last month (year 30)
+    // Calculate total costs over user's timeline
+    const finalMonth = snapshots[snapshots.length - 1]; // Last month of user's timeline
     const totalBuyingCosts = snapshots.reduce((sum, s) => sum + s.monthlyBuyingCosts, 0);
     const totalRentingCosts = snapshots.reduce((sum, s) => sum + s.monthlyRentingCosts, 0);
 
     setTotalCostData({
-      buyerFinalNetWorth: month360.buyerNetWorth,
-      renterFinalNetWorth: month360.renterNetWorth,
+      buyerFinalNetWorth: finalMonth.buyerNetWorth,
+      renterFinalNetWorth: finalMonth.renterNetWorth,
       totalBuyingCosts,
       totalRentingCosts,
-      finalHomeValue: month360.homeValue,
-      finalInvestmentValue: month360.investedDownPayment
+      finalHomeValue: finalMonth.homeValue,
+      finalInvestmentValue: finalMonth.investedDownPayment
     });
   };
   
@@ -819,6 +787,7 @@ const handleChipClick = (message: string) => {
               totalRentingCosts={totalData.totalRentingCosts}
               finalHomeValue={totalData.finalHomeValue}
               finalInvestmentValue={totalData.finalInvestmentValue}
+              timelineYears={Math.ceil((chartData?.length || 0) / 12)}
             />
           </div>
         ) : null;
@@ -846,16 +815,6 @@ const handleChipClick = (message: string) => {
   
   return (
     <div className="app-layout">
-      {/* Floating "Bottom Line?" Button - only show when charts are ready */}
-      {chartsReady && insights && (
-        <button 
-          className="bottom-line-trigger"
-          onClick={() => setShowInsightsModal(true)}
-          title="See the bottom line summary"
-        >
-          💡 Summary
-        </button>
-      )}
       
       {/* Location Data Card */}
       {showLocationCard && locationData && !isLocationLocked && (
@@ -955,6 +914,13 @@ const handleChipClick = (message: string) => {
                   </span>
                 </div>
                 <div className="reference-item">
+                  <span className="ref-label">⏰ Timeline:</span>
+                  <span className="ref-value">
+                    {userData.timeHorizonYears ? `${userData.timeHorizonYears} years` : '___'} 
+                    <small>(you chose)</small>
+                  </span>
+                </div>
+                <div className="reference-item">
                   <span className="ref-label">🏛️ Tax:</span>
                   <span className="ref-value">{locationData.propertyTaxRate}% <small>({locationData.state})</small></span>
                 </div>
@@ -993,6 +959,13 @@ const handleChipClick = (message: string) => {
                   <span className="ref-label">💰 Down:</span>
                   <span className="ref-value">
                     {userData.downPaymentPercent ? `${userData.downPaymentPercent}%` : '___'} 
+                    <small>(you chose)</small>
+                  </span>
+                </div>
+                <div className="reference-item">
+                  <span className="ref-label">⏰ Timeline:</span>
+                  <span className="ref-value">
+                    {userData.timeHorizonYears ? `${userData.timeHorizonYears} years` : '___'} 
                     <small>(you chose)</small>
                   </span>
                 </div>
@@ -1226,73 +1199,6 @@ Restart
               </div>
             )}
   
-      {/* Bottom Line Insights Modal */}
-      {showInsightsModal && insights && (
-        <div className="modal-overlay" onClick={() => setShowInsightsModal(false)}>
-          <div className="insights-modal" onClick={(e) => e.stopPropagation()}>
-            <button 
-              className="modal-close-btn"
-              onClick={() => setShowInsightsModal(false)}
-              aria-label="Close"
-            >
-              ×
-            </button>
-            
-            <div className="insights-modal-content">
-              <div className="insights-header">
-                <h3>💡 The Bottom Line</h3>
-                <span className="insights-subtitle">Based on 30-year projection</span>
-      </div>
-      
-              <div className="insights-description">
-                <p>Want quick numbers? Here are the key stats based on your scenario:</p>
-              </div>
-              
-              <div className="insights-grid">
-                <div className="insight-card primary">
-                  <div className="insight-label">30-Year Outcome</div>
-                  <div className="insight-value winner">
-                    {insights.winner === 'buying' ? '🏠 Buying' : '🏘️ Renting'}
-                  </div>
-                  <div className="insight-detail">
-                    Ahead by ${(insights.savings / 1000).toFixed(0)}k
-                  </div>
-                </div>
-                
-                <div className="insight-card">
-                  <div className="insight-label">Monthly Difference</div>
-                  <div className="insight-value">
-                    {insights.monthlyDiff > 0 ? '+' : ''}${Math.abs(insights.monthlyDiff).toFixed(0)}/mo
-                  </div>
-                  <div className="insight-detail">
-                    {insights.monthlyDiff > 0 
-                      ? 'Buying costs more monthly' 
-                      : 'Renting costs more monthly'}
-                  </div>
-      </div>
-      
-                <div className="insight-card">
-                  <div className="insight-label">Break-Even Point</div>
-                  <div className="insight-value">Year {insights.breakEvenYear}</div>
-                  <div className="insight-detail">
-                    When buying starts paying off
-                  </div>
-                </div>
-                
-                <div className="insight-card">
-                  <div className="insight-label">Risk Level</div>
-                  <div className="insight-value">
-                    <span className={`risk-badge risk-${insights.risk.toLowerCase()}`}>{insights.risk} Risk</span>
-                  </div>
-                  <div className="insight-detail">
-                    Based on market volatility
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
   
@@ -1383,6 +1289,10 @@ function extractUserData(message: string, currentData: UserData): { userData: Us
     else if ((isNewData || !newData.downPaymentPercent) && (num >= 1 && num <= 100 || lowerMessage.includes('%') || lowerMessage.includes('down'))) {
       newData.downPaymentPercent = num;
     }
+    // Time horizon (years, 1-30 range or has keywords)
+    else if ((isNewData || !newData.timeHorizonYears) && (num >= 1 && num <= 30 || lowerMessage.includes('year') || lowerMessage.includes('stay') || lowerMessage.includes('plan'))) {
+      newData.timeHorizonYears = num;
+    }
   }
   
   // If multiple numbers, assign by size
@@ -1409,10 +1319,16 @@ function extractUserData(message: string, currentData: UserData): { userData: Us
       newData.monthlyRent = rentNumber;
     }
     
-    // Small number = down payment %
+    // Small number = down payment % (1-100)
     const downNumber = allNumbers.find(n => n >= 1 && n <= 100 && n !== rentNumber);
     if ((shouldOverwrite || !newData.downPaymentPercent) && downNumber) {
       newData.downPaymentPercent = downNumber;
+    }
+    
+    // Time horizon (1-30 years)
+    const timeNumber = allNumbers.find(n => n >= 1 && n <= 30 && n !== downNumber && n !== rentNumber);
+    if ((shouldOverwrite || !newData.timeHorizonYears) && timeNumber) {
+      newData.timeHorizonYears = timeNumber;
     }
   }
   

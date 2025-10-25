@@ -20,7 +20,7 @@ export function NetWorthChart({ data }: NetWorthChartProps) {
   
   return (
     <div className="chart-container">
-      <h3 className="chart-title">Net Worth Comparison Over 30 Years</h3>
+      <h3 className="chart-title">Net Worth Comparison Over {Math.ceil(data.length / 12)} Years</h3>
       <ResponsiveContainer width="100%" height={400}>
         <LineChart data={chartData}>
           <CartesianGrid strokeDasharray="3 3" />

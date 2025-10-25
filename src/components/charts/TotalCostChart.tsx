@@ -9,6 +9,7 @@ interface TotalCostChartProps {
   totalRentingCosts: number;
   finalHomeValue: number;
   finalInvestmentValue: number;
+  timelineYears: number;
 }
 
 export function TotalCostChart({
@@ -17,7 +18,8 @@ export function TotalCostChart({
   totalBuyingCosts,
   totalRentingCosts,
   finalHomeValue,
-  finalInvestmentValue
+  finalInvestmentValue,
+  timelineYears
 }: TotalCostChartProps) {
   
   // Calculate net cost (what you spent minus what you have)
@@ -44,14 +46,14 @@ export function TotalCostChart({
   
   return (
     <div className="chart-container">
-      <h3 className="chart-title">30-Year Total Cost Comparison</h3>
+      <h3 className="chart-title">{timelineYears}-Year Total Cost Comparison</h3>
       
       <div className="breakeven-callout" style={{ 
         background: winner === 'Buying' 
           ? 'linear-gradient(135deg, #48bb78 0%, #38a169 100%)' 
           : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
       }}>
-        <p>🏆 <strong>{winner} saves you ${savings.toLocaleString()} over 30 years!</strong></p>
+        <p>🏆 <strong>{winner} saves you ${savings.toLocaleString()} over {timelineYears} years!</strong></p>
         <p>The net cost of {winner.toLowerCase()} is ${savings.toLocaleString()} lower.</p>      </div>
       
       <ResponsiveContainer width="100%" height={400}>
@@ -74,7 +76,7 @@ export function TotalCostChart({
             contentStyle={{ backgroundColor: 'white', border: '2px solid #667eea', borderRadius: '8px' }}
           />
           <Legend />
-          <Bar dataKey="netCost" name="Net Cost (after 30 years)" radius={[8, 8, 0, 0]}>
+          <Bar dataKey="netCost" name={`Net Cost (after ${timelineYears} years)`} radius={[8, 8, 0, 0]}>
             <Cell fill="#667eea" />
             <Cell fill="#f56565" />
           </Bar>
@@ -99,7 +101,7 @@ export function TotalCostChart({
       </div>
       
       <p className="chart-description" style={{ marginTop: '16px' }}>
-        This shows your true cost after 30 years. <strong>Lower net cost = better financial choice!</strong>
+        This shows your true cost after {timelineYears} years. <strong>Lower net cost = better financial choice!</strong>
       </p>
     </div>
   );
