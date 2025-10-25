@@ -12,6 +12,33 @@ import { TotalCostChart } from '../charts/TotalCostChart';
 import { getAIResponse } from '../../lib/ai/openai';
 import { EquityBuildupChart } from '../charts/EquityBuildupChart';
 import { RentGrowthChart } from '../charts/RentGrowthChart';
+import { BreakEvenChart } from '../charts/BreakEvenChart';
+
+// Timeline-based assumptions helper
+function getTimelineBasedRates(timeHorizonYears: number): {
+  homeAppreciationRate: number;
+  investmentReturnRate: number;
+} {
+  if (timeHorizonYears <= 3) {
+    // Short timeline: Conservative assumptions
+    return {
+      homeAppreciationRate: 0.5,  // 0.5% annual (realistic for short-term)
+      investmentReturnRate: 4.0   // 4% annual (conservative)
+    };
+  } else if (timeHorizonYears <= 7) {
+    // Medium timeline: Moderate assumptions
+    return {
+      homeAppreciationRate: 1.5,  // 1.5% annual (moderate)
+      investmentReturnRate: 6.0   // 6% annual (moderate)
+    };
+  } else {
+    // Long timeline: Optimistic assumptions
+    return {
+      homeAppreciationRate: 2.5,  // 2.5% annual (optimistic)
+      investmentReturnRate: 7.0   // 7% annual (optimistic)
+    };
+  }
+}
 import { SuggestionChips } from './SuggestionChips';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
@@ -20,7 +47,7 @@ interface Message {
   id: string;
   role: 'user' | 'assistant' | 'system';
   content: string;
-  chartToShow?: 'netWorth' | 'monthlyCost' | 'totalCost' | 'equity' | 'rentGrowth';
+  chartToShow?: 'netWorth' | 'monthlyCost' | 'totalCost' | 'equity' | 'rentGrowth' | 'breakEven';
   // Store chart data with the message so it doesn't change when new scenarios are calculated
   snapshotData?: {
     chartData: MonthlySnapshot[];
@@ -75,7 +102,8 @@ export function ChatContainer() {
   monthlyCost: false,
   totalCost: false,
   equity: false,
-  rentGrowth: false
+  rentGrowth: false,
+  breakEven: false
 });
 
 // Track if charts are ready to show (data calculated)
@@ -182,10 +210,11 @@ const [chartsReady, setChartsReady] = useState(false);
         if (message.chartToShow && message.snapshotData) {
           const chartNames = {
             netWorth: 'Net Worth Comparison',
-            monthlyCost: 'Monthly Costs Breakdown', 
+            monthlyCost: 'Monthly Costs Breakdown',
             totalCost: 'Total Cost Comparison',
             equity: 'Equity Buildup',
-            rentGrowth: 'Rent Growth Comparison'
+            rentGrowth: 'Rent Growth Comparison',
+            breakEven: 'Break-Even Timeline'
           };
           
           const chartName = chartNames[message.chartToShow] || message.chartToShow;
@@ -266,7 +295,8 @@ const [chartsReady, setChartsReady] = useState(false);
       monthlyCost: false,
       totalCost: false,
       equity: false,
-      rentGrowth: false
+      rentGrowth: false,
+      breakEven: false
     });
     setChartsReady(false);
     setMonthlyCosts(null);
@@ -338,6 +368,7 @@ function shouldShowChart(aiResponse: string): string | null {
   if (lower.match(/here'?s your (updated |new )?equity buildup/)) return 'equity';
   // More flexible pattern for Rent Growth (with or without "chart", "comparison", etc.)
   if (lower.match(/here'?s your (updated |new )?rent growth( chart| comparison)?/)) return 'rentGrowth';
+  if (lower.match(/here'?s your (updated |new )?break.?even timeline/)) return 'breakEven';
   
   return null;
 }
@@ -513,11 +544,11 @@ function shouldShowChart(aiResponse: string): string | null {
         homeInsuranceAnnual: 1200,
         hoaMonthly: 150,
         maintenanceRate: 1.0,
-        homeAppreciationRate: 3.0,
+        homeAppreciationRate: getTimelineBasedRates(newUserData.timeHorizonYears!).homeAppreciationRate,
         monthlyRent: newUserData.monthlyRent!,
         rentGrowthRate: 3.5,
         renterInsuranceAnnual: 240,
-        investmentReturnRate: 7.0
+        investmentReturnRate: getTimelineBasedRates(newUserData.timeHorizonYears!).investmentReturnRate
       } as ScenarioInputs;
       
       // Calculate net worth comparison
@@ -569,7 +600,8 @@ function shouldShowChart(aiResponse: string): string | null {
         monthlyCost: false,
         totalCost: false,
         equity: false,
-        rentGrowth: false
+        rentGrowth: false,
+        breakEven: false
       });
   }
 
@@ -591,7 +623,7 @@ function shouldShowChart(aiResponse: string): string | null {
       id: (Date.now() + 1).toString(),
       role: 'assistant',
         content: botResponse,
-        chartToShow: chartToShow as 'netWorth' | 'monthlyCost' | 'totalCost' | 'equity' | 'rentGrowth',
+        chartToShow: chartToShow as 'netWorth' | 'monthlyCost' | 'totalCost' | 'equity' | 'rentGrowth' | 'breakEven',
         snapshotData: {
           chartData: freshChartData,
           monthlyCosts: freshMonthlyCosts,
@@ -636,7 +668,8 @@ function shouldShowChart(aiResponse: string): string | null {
           type: 'confirmation',
           homePrice: newUserData.homePrice!,
           monthlyRent: newUserData.monthlyRent!,
-          downPaymentPercent: newUserData.downPaymentPercent!
+          downPaymentPercent: newUserData.downPaymentPercent!,
+          timeHorizonYears: newUserData.timeHorizonYears!
         })
       };
       setMessages(prev => [...prev, confirmationCard]);
@@ -681,9 +714,9 @@ const handleChipClick = (message: string) => {
       hoaMonthly: 150,
       maintenanceRate: 1.0,
       renterInsuranceAnnual: 240,
-      homeAppreciationRate: 3.0,
+      homeAppreciationRate: getTimelineBasedRates(data.timeHorizonYears!).homeAppreciationRate,
       rentGrowthRate: 3.5,
-      investmentReturnRate: 7.0
+      investmentReturnRate: getTimelineBasedRates(data.timeHorizonYears!).investmentReturnRate
     };
     
     // Calculate net worth comparison
@@ -808,6 +841,13 @@ const handleChipClick = (message: string) => {
             />
           </div>
         ) : null;
+      case 'breakEven':
+        return (
+          <div className="chart-wrapper">
+            {ValuesBox}
+            <BreakEvenChart data={data} />
+          </div>
+        );
       default:
         return null;
     }
@@ -931,11 +971,17 @@ const handleChipClick = (message: string) => {
                 </div>
                 <div className="reference-item">
                   <span className="ref-label">🏘️ Appreciation:</span>
-                  <span className="ref-value">3.0%/year <small>(nat'l avg)</small></span>
+                  <span className="ref-value">
+                    {userData.timeHorizonYears ? `${getTimelineBasedRates(userData.timeHorizonYears).homeAppreciationRate}%/year` : '___'} 
+                    <small>(based on your timeline selection)</small>
+                  </span>
                 </div>
                 <div className="reference-item">
                   <span className="ref-label">💹 Investment:</span>
-                  <span className="ref-value">7.0%/year <small>(S&P 500)</small></span>
+                  <span className="ref-value">
+                    {userData.timeHorizonYears ? `${getTimelineBasedRates(userData.timeHorizonYears).investmentReturnRate}%/year` : '___'} 
+                    <small>(based on your timeline selection)</small>
+                  </span>
                 </div>
               </>
             ) : (
@@ -980,11 +1026,17 @@ const handleChipClick = (message: string) => {
                 </div>
                 <div className="reference-item">
                   <span className="ref-label">🏘️ Appreciation:</span>
-                  <span className="ref-value">3.0%/year <small>(nat'l avg)</small></span>
+                  <span className="ref-value">
+                    {userData.timeHorizonYears ? `${getTimelineBasedRates(userData.timeHorizonYears).homeAppreciationRate}%/year` : '___'} 
+                    <small>(based on your timeline selection)</small>
+                  </span>
                 </div>
                 <div className="reference-item">
                   <span className="ref-label">💹 Investment:</span>
-                  <span className="ref-value">7.0%/year <small>(S&P 500)</small></span>
+                  <span className="ref-value">
+                    {userData.timeHorizonYears ? `${getTimelineBasedRates(userData.timeHorizonYears).investmentReturnRate}%/year` : '___'} 
+                    <small>(based on your timeline selection)</small>
+                  </span>
                 </div>
               </>
             )}
@@ -1041,6 +1093,11 @@ Restart
                             <span className="confirmation-icon">💰</span>
                             <span className="confirmation-label">Down:</span>
                             <span className="confirmation-value">{data.downPaymentPercent}% (${downPaymentAmount.toLocaleString()})</span>
+                          </div>
+                          <div className="confirmation-item">
+                            <span className="confirmation-icon">⏰</span>
+                            <span className="confirmation-label">Timeline:</span>
+                            <span className="confirmation-value">{data.timeHorizonYears} years</span>
                           </div>
                         </div>
                       </div>
@@ -1124,6 +1181,13 @@ Restart
             >
               📊 Rent
             </button>
+            <button 
+              className="chart-nav-btn-sm"
+              onClick={() => handleChipClick('show me break even')}
+              title="View Break-Even Timeline"
+            >
+              ⏰ Break-Even
+            </button>
           </div>
               </div>
             )}
@@ -1195,10 +1259,10 @@ Restart
               <div className="progress-text">{saveProgress}%</div>
               </div>
             <p className="progress-label">Generating PDF...</p>
-              </div>
+      </div>
               </div>
             )}
-  
+      
     </div>
   );
   
@@ -1289,8 +1353,8 @@ function extractUserData(message: string, currentData: UserData): { userData: Us
     else if ((isNewData || !newData.downPaymentPercent) && (num >= 1 && num <= 100 || lowerMessage.includes('%') || lowerMessage.includes('down'))) {
       newData.downPaymentPercent = num;
     }
-    // Time horizon (years, 1-30 range or has keywords)
-    else if ((isNewData || !newData.timeHorizonYears) && (num >= 1 && num <= 30 || lowerMessage.includes('year') || lowerMessage.includes('stay') || lowerMessage.includes('plan'))) {
+    // Time horizon (years, 1-30 range or has keywords) - ONLY if down payment is already set
+    else if ((isNewData || !newData.timeHorizonYears) && (num >= 1 && num <= 30 || lowerMessage.includes('year') || lowerMessage.includes('stay') || lowerMessage.includes('plan')) && newData.downPaymentPercent) {
       newData.timeHorizonYears = num;
     }
   }

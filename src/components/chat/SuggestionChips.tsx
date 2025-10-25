@@ -11,6 +11,7 @@ interface SuggestionChipsProps {
     totalCost: boolean;
     equity: boolean;
     rentGrowth: boolean;
+    breakEven: boolean;
   };
 }
 
@@ -101,7 +102,7 @@ export function SuggestionChips({ onChipClick, visibleCharts }: SuggestionChipsP
     // Show first 2, keep rest in queue
     setDisplayedChips(shuffled.slice(0, 2));
     setRemainingChips(shuffled.slice(2));
-  }, [visibleCharts.netWorth, visibleCharts.monthlyCost, visibleCharts.totalCost, visibleCharts.equity, visibleCharts.rentGrowth]);
+  }, [visibleCharts.netWorth, visibleCharts.monthlyCost, visibleCharts.totalCost, visibleCharts.equity, visibleCharts.rentGrowth, visibleCharts.breakEven]);
 
   const handleChipClick = (chip: Suggestion) => {
     // Send the message

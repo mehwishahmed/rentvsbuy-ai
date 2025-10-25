@@ -3,6 +3,35 @@
 import type { ScenarioInputs, MonthlySnapshot } from '../../types/calculator';
 
 // ===================================
+// TIMELINE-BASED ASSUMPTIONS
+// ===================================
+
+function getTimelineBasedRates(timeHorizonYears: number): {
+  homeAppreciationRate: number;
+  investmentReturnRate: number;
+} {
+  if (timeHorizonYears <= 3) {
+    // Short timeline: Conservative assumptions
+    return {
+      homeAppreciationRate: 0.5,  // 0.5% annual (realistic for short-term)
+      investmentReturnRate: 4.0   // 4% annual (conservative)
+    };
+  } else if (timeHorizonYears <= 7) {
+    // Medium timeline: Moderate assumptions
+    return {
+      homeAppreciationRate: 1.5,  // 1.5% annual (moderate)
+      investmentReturnRate: 6.0   // 6% annual (moderate)
+    };
+  } else {
+    // Long timeline: Optimistic assumptions
+    return {
+      homeAppreciationRate: 2.5,  // 2.5% annual (optimistic)
+      investmentReturnRate: 7.0   // 7% annual (optimistic)
+    };
+  }
+}
+
+// ===================================
 // FUNCTION #1: Calculate Monthly Mortgage Payment
 // ===================================
 
@@ -165,58 +194,108 @@ export function calculateRentingCosts(
 export function calculateNetWorthComparison(inputs: ScenarioInputs): MonthlySnapshot[] {
     const snapshots: MonthlySnapshot[] = [];
     
+    // Calculate loan amount (home price - down payment)
     const downPaymentAmount = inputs.homePrice * (inputs.downPaymentPercent / 100);
     const loanAmount = inputs.homePrice - downPaymentAmount;
+    
+    // Generate amortization schedule for the full loan term (30 years)
     const amortization = generateAmortizationSchedule(
       loanAmount,
       inputs.interestRate,
-      inputs.timeHorizonYears
+      30  // Always use 30-year loan term, not user's timeline
     );
     
-    const buyingCosts = calculateBuyingCosts(inputs);
+    // Get timeline-based assumptions
+    const timelineRates = getTimelineBasedRates(inputs.timeHorizonYears);
+    const monthlyInvestmentReturn = timelineRates.investmentReturnRate / 100 / 12;
+    const monthlyHomeAppreciation = timelineRates.homeAppreciationRate / 100 / 12;
+    const monthlyRentGrowth = inputs.rentGrowthRate / 100 / 12;
     
-    // Track invested down payment for renter
-    let investedDownPayment = downPaymentAmount;
-    const monthlyInvestmentReturn = inputs.investmentReturnRate / 100 / 12;
+    // Initialize tracking variables
+    let homeValue = inputs.homePrice;
+    let remainingBalance = loanAmount;
+    let rent = inputs.monthlyRent;
+    
+    // Upfront costs
+    const closingCostsBuy = inputs.homePrice * 0.03; // 3% closing costs
+    const closingCostsSell = 0.08; // 8% selling costs (applied at end)
+    
+    // Day 0: Initial positions
+    let buyerCashAccount = -downPaymentAmount - closingCostsBuy; // Buyer spent down payment + closing
+    let buyerEquity = downPaymentAmount; // Buyer's initial equity
+    let renterPortfolio = downPaymentAmount; // Renter keeps/invests the down payment
     
     // Loop through the user's timeline (convert years to months)
     const totalMonths = inputs.timeHorizonYears * 12;
     for (let month = 1; month <= totalMonths; month++) {
       const amortMonth = amortization[month - 1];
       
-      // === BUYING SCENARIO ===
-      const yearsElapsed = (month - 1) / 12;
-      const homeValue = inputs.homePrice * Math.pow(1 + inputs.homeAppreciationRate / 100, yearsElapsed);
+      // === GROWTH ===
+      homeValue *= (1 + monthlyHomeAppreciation);
+      rent *= (1 + monthlyRentGrowth);
       
-      // Calculate selling costs (6% realtor + 2% closing = 8% total)
-      // Only apply when you actually sell (final month of timeline)
-      const isFinalMonth = month === totalMonths;
-      const sellingCosts = isFinalMonth ? homeValue * 0.08 : 0;
-      const homeEquity = homeValue - amortMonth.remainingBalance - sellingCosts;
-      const buyerNetWorth = homeEquity;
+      // === MORTGAGE AMORTIZATION ===
+      const interestPaid = remainingBalance * (inputs.interestRate / 100 / 12);
+      const principalPaid = amortMonth.payment - interestPaid;
+      remainingBalance = Math.max(0, remainingBalance - principalPaid);
+      buyerEquity = homeValue - remainingBalance;
       
-      // Debug logging for 2-year scenario
-      if (inputs.timeHorizonYears === 2 && isFinalMonth) {
-        console.log('🔍 SELLING COSTS DEBUG:');
-        console.log('Home Value:', homeValue);
-        console.log('Selling Costs (8%):', sellingCosts);
-        console.log('Remaining Balance:', amortMonth.remainingBalance);
-        console.log('Home Equity (after selling costs):', homeEquity);
-        console.log('Buyer Net Worth:', buyerNetWorth);
+      // === MONTHLY OWNER COSTS (non-equity) ===
+      const propertyTaxMonthly = (inputs.propertyTaxRate / 100 * homeValue) / 12;
+      const insuranceMonthly = inputs.homeInsuranceAnnual / 12;
+      const maintenanceMonthly = (inputs.maintenanceRate / 100 * homeValue) / 12;
+      const hoaMonthly = inputs.hoaMonthly;
+      
+      // PMI logic (until LTV <= 80%)
+      const hasPMI = (remainingBalance / homeValue) > 0.80;
+      const pmiMonthly = hasPMI ? (loanAmount * 0.005) / 12 : 0; // 0.5% PMI rate
+      
+      const ownerMonthlyCost = 
+        interestPaid + 
+        propertyTaxMonthly + 
+        insuranceMonthly + 
+        maintenanceMonthly + 
+        hoaMonthly + 
+        pmiMonthly;
+      
+      // === MONTHLY RENTER COSTS ===
+      const renterMonthlyCost = rent;
+      
+      // === CASH FLOW DIFFERENCE INVESTING ===
+      const cashFlowDiff = renterMonthlyCost - ownerMonthlyCost;
+      
+      if (cashFlowDiff > 0) {
+        // Renting is cheaper - renter invests the difference
+        renterPortfolio = (renterPortfolio + cashFlowDiff) * (1 + monthlyInvestmentReturn);
+      } else {
+        // Owning is cheaper - buyer keeps the savings
+        buyerCashAccount = (buyerCashAccount + (-cashFlowDiff)) * (1 + monthlyInvestmentReturn);
       }
       
-      // === RENTING SCENARIO ===
-      const rentingCosts = calculateRentingCosts(inputs, month);
+      // === NET WORTH CALCULATION ===
+      const isFinalMonth = month === totalMonths;
+      const sellingCosts = isFinalMonth ? homeValue * closingCostsSell : 0;
       
-      // Invested down payment grows each month (compound interest)
-      investedDownPayment = investedDownPayment * (1 + monthlyInvestmentReturn);
-      
-      // Renter's net worth = invested down payment
-      const renterNetWorth = investedDownPayment;
-      
-      // === COMPARISON ===
+      const buyerNetWorth = (buyerEquity - sellingCosts) + buyerCashAccount;
+      const renterNetWorth = renterPortfolio;
       const netWorthDelta = buyerNetWorth - renterNetWorth;
       
+      // Debug logging for 1-year scenario
+      if (inputs.timeHorizonYears === 1 && month === 12) {
+        console.log('🔍 1-YEAR DEBUG (Month 12):');
+        console.log('Home Value:', homeValue);
+        console.log('Buyer Equity:', buyerEquity);
+        console.log('Selling Costs:', sellingCosts);
+        console.log('Buyer Cash Account:', buyerCashAccount);
+        console.log('Buyer Net Worth:', buyerNetWorth);
+        console.log('Renter Portfolio:', renterNetWorth);
+        console.log('Net Worth Delta:', netWorthDelta);
+        console.log('Cash Flow Diff (month 12):', cashFlowDiff);
+        console.log('Owner Monthly Cost (month 12):', ownerMonthlyCost);
+        console.log('Renter Monthly Cost (month 12):', renterMonthlyCost);
+      }
+      
+      // === STORE SNAPSHOT ===
       snapshots.push({
         month,
         mortgagePayment: amortMonth.payment,
@@ -224,11 +303,11 @@ export function calculateNetWorthComparison(inputs: ScenarioInputs): MonthlySnap
         interestPaid: amortMonth.interestPaid,
         remainingBalance: amortMonth.remainingBalance,
         homeValue,
-        homeEquity,
-        monthlyBuyingCosts: buyingCosts.total,
-        monthlyRent: rentingCosts.monthlyRent,
-        monthlyRentingCosts: rentingCosts.total,
-        investedDownPayment,
+        homeEquity: buyerEquity,
+        monthlyBuyingCosts: ownerMonthlyCost,
+        monthlyRent: rent,
+        monthlyRentingCosts: renterMonthlyCost,
+        investedDownPayment: renterPortfolio,
         buyerNetWorth,
         renterNetWorth,
         netWorthDelta
