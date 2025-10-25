@@ -1369,61 +1369,6 @@ body {
   color: white;
 }
 
-/* Confirmation Card Styles */
-.confirmation-card {
-  background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
-  border-radius: 12px;
-  padding: 20px;
-  margin: 16px 0;
-  box-shadow: 0 4px 12px rgba(72, 187, 120, 0.3);
-  animation: fadeInUp 0.5s ease-out;
-  max-width: 400px;
-}
-
-.confirmation-header {
-  color: white;
-  font-size: 18px;
-  font-weight: 600;
-  margin-bottom: 16px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.confirmation-details {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.confirmation-item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  background: rgba(255, 255, 255, 0.15);
-  backdrop-filter: blur(10px);
-  padding: 10px 14px;
-  border-radius: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-}
-
-.confirmation-icon {
-  font-size: 20px;
-}
-
-.confirmation-label {
-  color: rgba(255, 255, 255, 0.9);
-  font-size: 13px;
-  font-weight: 500;
-  min-width: 50px;
-}
-
-.confirmation-value {
-  color: white;
-  font-size: 15px;
-  font-weight: 600;
-  margin-left: auto;
-}
 
 /* Mobile responsiveness for insights */
 @media (max-width: 1024px) {

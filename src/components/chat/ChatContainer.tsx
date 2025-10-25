@@ -1244,51 +1244,10 @@ Restart
       <div className="messages-container">
         {messages.map(message => (
           <div key={message.id} data-message-id={message.id}>
-            {/* Render confirmation card for system messages */}
-            {message.role === 'system' ? (
-              (() => {
-                try {
-                  const data = JSON.parse(message.content);
-                  if (data.type === 'confirmation') {
-                    const downPaymentAmount = (data.homePrice * data.downPaymentPercent) / 100;
-                    return (
-                      <div className="confirmation-card">
-                        <div className="confirmation-header">✓ Your Scenario</div>
-                        <div className="confirmation-details">
-                          <div className="confirmation-item">
-                            <span className="confirmation-icon">🏠</span>
-                            <span className="confirmation-label">Home:</span>
-                            <span className="confirmation-value">${data.homePrice.toLocaleString()}</span>
-                          </div>
-                          <div className="confirmation-item">
-                            <span className="confirmation-icon">💵</span>
-                            <span className="confirmation-label">Rent:</span>
-                            <span className="confirmation-value">${data.monthlyRent.toLocaleString()}/mo</span>
-                          </div>
-                          <div className="confirmation-item">
-                            <span className="confirmation-icon">💰</span>
-                            <span className="confirmation-label">Down:</span>
-                            <span className="confirmation-value">{data.downPaymentPercent}% (${downPaymentAmount.toLocaleString()})</span>
-                          </div>
-                          <div className="confirmation-item">
-                            <span className="confirmation-icon">⏰</span>
-                            <span className="confirmation-label">Timeline:</span>
-                            <span className="confirmation-value">{data.timeHorizonYears} years</span>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  }
-                } catch (e) {
-                  return null;
-                }
-              })()
-            ) : (
-          <ChatMessage
-            role={message.role}
-            content={message.content}
-          />
-            )}
+            <ChatMessage
+              role={message.role}
+              content={message.content}
+            />
             {/* Render chart right after message if it has one - uses message's snapshot data */}
             {message.chartToShow && renderChart(message.chartToShow, message.snapshotData)}
           </div>
