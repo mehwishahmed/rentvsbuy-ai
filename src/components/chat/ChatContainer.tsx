@@ -13,32 +13,7 @@ import { getAIResponse } from '../../lib/ai/openai';
 import { EquityBuildupChart } from '../charts/EquityBuildupChart';
 import { RentGrowthChart } from '../charts/RentGrowthChart';
 import { BreakEvenChart } from '../charts/BreakEvenChart';
-
-// Timeline-based assumptions helper
-function getTimelineBasedRates(timeHorizonYears: number): {
-  homeAppreciationRate: number;
-  investmentReturnRate: number;
-} {
-  if (timeHorizonYears <= 3) {
-    // Short timeline: Conservative assumptions
-    return {
-      homeAppreciationRate: 0.5,  // 0.5% annual (realistic for short-term)
-      investmentReturnRate: 4.0   // 4% annual (conservative)
-    };
-  } else if (timeHorizonYears <= 7) {
-    // Medium timeline: Moderate assumptions
-    return {
-      homeAppreciationRate: 1.5,  // 1.5% annual (moderate)
-      investmentReturnRate: 6.0   // 6% annual (moderate)
-    };
-  } else {
-    // Long timeline: Optimistic assumptions
-    return {
-      homeAppreciationRate: 2.5,  // 2.5% annual (optimistic)
-      investmentReturnRate: 7.0   // 7% annual (optimistic)
-    };
-  }
-}
+import { getZIPBasedRates } from '../../lib/finance/calculator';
 import { SuggestionChips } from './SuggestionChips';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
@@ -544,11 +519,11 @@ function shouldShowChart(aiResponse: string): string | null {
         homeInsuranceAnnual: 1200,
         hoaMonthly: 150,
         maintenanceRate: 1.0,
-        homeAppreciationRate: getTimelineBasedRates(newUserData.timeHorizonYears!).homeAppreciationRate,
+        homeAppreciationRate: getZIPBasedRates(locationData, newUserData.timeHorizonYears!).homeAppreciationRate,
         monthlyRent: newUserData.monthlyRent!,
-        rentGrowthRate: 3.5,
+        rentGrowthRate: getZIPBasedRates(locationData, newUserData.timeHorizonYears!).rentGrowthRate,
         renterInsuranceAnnual: 240,
-        investmentReturnRate: getTimelineBasedRates(newUserData.timeHorizonYears!).investmentReturnRate
+        investmentReturnRate: getZIPBasedRates(locationData, newUserData.timeHorizonYears!).investmentReturnRate
       } as ScenarioInputs;
       
       // Calculate net worth comparison
@@ -687,7 +662,14 @@ function shouldShowChart(aiResponse: string): string | null {
     
     // If we have all data and haven't calculated yet (initial case, not data change)
     if (hasAllData && !chartsReady && !dataChanged) {
-      calculateAndShowChart(newUserData);
+      console.log('🔍 Calling calculateAndShowChart with locationData:', locationData);
+      calculateAndShowChart(newUserData, locationData);
+    }
+    
+    // Force recalculation if we have location data and charts are ready
+    if (hasAllData && chartsReady && locationData) {
+      console.log('🔍 Force recalculating with location data:', locationData);
+      calculateAndShowChart(newUserData, locationData);
     }
   };
 
@@ -698,9 +680,16 @@ const handleChipClick = (message: string) => {
     
 };
 
-  const calculateAndShowChart = (data: UserData) => {
+  const calculateAndShowChart = (data: UserData, currentLocationData?: FormattedLocationData | null) => {
     // Use local property tax rate if available, otherwise default to 1.0%
-    const propertyTaxRate = locationData?.propertyTaxRate || 1.0;
+    // ZIP data stores propertyTaxRate as decimal (0.73 = 0.73%), so convert to percentage
+    const propertyTaxRate = (currentLocationData || locationData)?.propertyTaxRate ? (currentLocationData || locationData).propertyTaxRate * 100 : 1.0;
+    
+    // Debug logging for property tax rate
+    console.log('🔍 Property Tax Rate Debug:');
+    console.log('Location Data:', currentLocationData || locationData);
+    console.log('Property Tax Rate (raw):', (currentLocationData || locationData)?.propertyTaxRate);
+    console.log('Property Tax Rate (converted):', propertyTaxRate);
     
     const inputs: ScenarioInputs = {
       homePrice: data.homePrice!,
@@ -714,9 +703,9 @@ const handleChipClick = (message: string) => {
       hoaMonthly: 150,
       maintenanceRate: 1.0,
       renterInsuranceAnnual: 240,
-      homeAppreciationRate: getTimelineBasedRates(data.timeHorizonYears!).homeAppreciationRate,
-      rentGrowthRate: 3.5,
-      investmentReturnRate: getTimelineBasedRates(data.timeHorizonYears!).investmentReturnRate
+      homeAppreciationRate: getZIPBasedRates(locationData, data.timeHorizonYears!).homeAppreciationRate,
+      rentGrowthRate: getZIPBasedRates(locationData, data.timeHorizonYears!).rentGrowthRate,
+      investmentReturnRate: getZIPBasedRates(locationData, data.timeHorizonYears!).investmentReturnRate
     };
     
     // Calculate net worth comparison
@@ -763,7 +752,8 @@ const handleChipClick = (message: string) => {
   const renderChart = (chartType: string, snapshotData?: Message['snapshotData']) => {
     // Use snapshot data from the message, or fall back to current data
     const data = snapshotData?.chartData || chartData;
-    const costs = snapshotData?.monthlyCosts || monthlyCosts;
+    // For monthly cost chart, always use fresh data if available (to get updated ZIP-based rates)
+    const costs = chartType === 'monthlyCost' ? monthlyCosts : (snapshotData?.monthlyCosts || monthlyCosts);
     const totalData = snapshotData?.totalCostData || totalCostData;
     const inputVals = snapshotData?.inputValues || (userData.homePrice && userData.monthlyRent && userData.downPaymentPercent ? {
       homePrice: userData.homePrice,
@@ -962,25 +952,28 @@ const handleChipClick = (message: string) => {
                 </div>
                 <div className="reference-item">
                   <span className="ref-label">🏛️ Tax:</span>
-                  <span className="ref-value">{locationData.propertyTaxRate}% <small>({locationData.state})</small></span>
+                  <span className="ref-value">{(locationData.propertyTaxRate * 100).toFixed(2)}% <small>({locationData.state})</small></span>
                 </div>
                 <div className="reference-divider"></div>
                 <div className="reference-item">
                   <span className="ref-label">📈 Rent growth:</span>
-                  <span className="ref-value">3.5%/year <small>(nat'l avg)</small></span>
+                  <span className="ref-value">
+                    {userData.timeHorizonYears ? `${getZIPBasedRates(locationData, userData.timeHorizonYears).rentGrowthRate.toFixed(1)}%/year` : '___'} 
+                    <small>({locationData ? `${locationData.city} market` : 'nat\'l avg'})</small>
+                  </span>
                 </div>
                 <div className="reference-item">
                   <span className="ref-label">🏘️ Appreciation:</span>
                   <span className="ref-value">
-                    {userData.timeHorizonYears ? `${getTimelineBasedRates(userData.timeHorizonYears).homeAppreciationRate}%/year` : '___'} 
-                    <small>(based on your timeline selection)</small>
+                    {userData.timeHorizonYears ? `${getZIPBasedRates(locationData, userData.timeHorizonYears).homeAppreciationRate.toFixed(1)}%/year` : '___'} 
+                    <small>({locationData ? `${locationData.city} market` : 'based on timeline'})</small>
                   </span>
                 </div>
                 <div className="reference-item">
                   <span className="ref-label">💹 Investment:</span>
                   <span className="ref-value">
-                    {userData.timeHorizonYears ? `${getTimelineBasedRates(userData.timeHorizonYears).investmentReturnRate}%/year` : '___'} 
-                    <small>(based on your timeline selection)</small>
+                    {userData.timeHorizonYears ? `${getZIPBasedRates(locationData, userData.timeHorizonYears).investmentReturnRate}%/year` : '___'} 
+                    <small>(based on timeline)</small>
                   </span>
                 </div>
               </>
@@ -1022,20 +1015,23 @@ const handleChipClick = (message: string) => {
                 <div className="reference-divider"></div>
                 <div className="reference-item">
                   <span className="ref-label">📈 Rent growth:</span>
-                  <span className="ref-value">3.5%/year <small>(nat'l avg)</small></span>
+                  <span className="ref-value">
+                    {userData.timeHorizonYears ? `${getZIPBasedRates(locationData, userData.timeHorizonYears).rentGrowthRate.toFixed(1)}%/year` : '___'} 
+                    <small>({locationData ? `${locationData.city} market` : 'nat\'l avg'})</small>
+                  </span>
                 </div>
                 <div className="reference-item">
                   <span className="ref-label">🏘️ Appreciation:</span>
                   <span className="ref-value">
-                    {userData.timeHorizonYears ? `${getTimelineBasedRates(userData.timeHorizonYears).homeAppreciationRate}%/year` : '___'} 
-                    <small>(based on your timeline selection)</small>
+                    {userData.timeHorizonYears ? `${getZIPBasedRates(locationData, userData.timeHorizonYears).homeAppreciationRate.toFixed(1)}%/year` : '___'} 
+                    <small>({locationData ? `${locationData.city} market` : 'based on timeline'})</small>
                   </span>
                 </div>
                 <div className="reference-item">
                   <span className="ref-label">💹 Investment:</span>
                   <span className="ref-value">
-                    {userData.timeHorizonYears ? `${getTimelineBasedRates(userData.timeHorizonYears).investmentReturnRate}%/year` : '___'} 
-                    <small>(based on your timeline selection)</small>
+                    {userData.timeHorizonYears ? `${getZIPBasedRates(locationData, userData.timeHorizonYears).investmentReturnRate}%/year` : '___'} 
+                    <small>(based on timeline)</small>
                   </span>
                 </div>
               </>

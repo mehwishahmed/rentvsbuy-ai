@@ -6,7 +6,10 @@ export interface LocationData {
   state: string;
   city: string;
   homeValue: number;
+  homeValueGrowthRate: number;
+  propertyTaxRate: number;
   rentValue: number;
+  rentValueGrowthRate: number;
 }
 
 export interface FormattedLocationData {
@@ -15,6 +18,8 @@ export interface FormattedLocationData {
   medianHomePrice: number;
   averageRent: number;
   propertyTaxRate: number;
+  homeAppreciationRate: number;
+  rentGrowthRate: number;
 }
 
 // Property tax rates by state (approximate averages)
@@ -40,7 +45,9 @@ export const formatLocationData = (data: LocationData): FormattedLocationData =>
     state: data.state,
     medianHomePrice: data.homeValue,
     averageRent: data.rentValue,
-    propertyTaxRate: PROPERTY_TAX_RATES[data.state] || 1.0
+    propertyTaxRate: data.propertyTaxRate,
+    homeAppreciationRate: data.homeValueGrowthRate,
+    rentGrowthRate: data.rentValueGrowthRate
   };
 };
 

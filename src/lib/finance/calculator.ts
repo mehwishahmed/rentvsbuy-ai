@@ -31,6 +31,40 @@ function getTimelineBasedRates(timeHorizonYears: number): {
   }
 }
 
+// ZIP + Timeline Hybrid: Use local rates with timeline adjustments
+export function getZIPBasedRates(
+  locationData: any, // FormattedLocationData | null
+  timeHorizonYears: number
+): { homeAppreciationRate: number; rentGrowthRate: number; investmentReturnRate: number } {
+  
+  // Get timeline-based investment return (always use timeline for investment)
+  const timelineRates = getTimelineBasedRates(timeHorizonYears);
+  
+  if (locationData?.homeAppreciationRate && locationData?.rentGrowthRate) {
+    // Use ZIP-specific rates with timeline adjustments
+    const timelineMultiplier = getTimelineMultiplier(timeHorizonYears);
+    
+    return {
+      homeAppreciationRate: locationData.homeAppreciationRate * timelineMultiplier, // Allow negative rates
+      rentGrowthRate: Math.max(0, locationData.rentGrowthRate * timelineMultiplier),
+      investmentReturnRate: timelineRates.investmentReturnRate
+    };
+  }
+  
+  // Fallback to timeline-based rates
+  return {
+    homeAppreciationRate: timelineRates.homeAppreciationRate,
+    rentGrowthRate: 3.5, // Default rent growth
+    investmentReturnRate: timelineRates.investmentReturnRate
+  };
+}
+
+function getTimelineMultiplier(timeHorizonYears: number): number {
+  if (timeHorizonYears <= 3) return 0.1;  // 10% of market rate (conservative for short-term)
+  if (timeHorizonYears <= 7) return 0.5;  // 50% of market rate (moderate)
+  return 1.0; // 100% of market rate (full market rate for long-term)
+}
+
 // ===================================
 // FUNCTION #1: Calculate Monthly Mortgage Payment
 // ===================================
@@ -132,6 +166,13 @@ export function calculateBuyingCosts(inputs: ScenarioInputs): {
     
     // Property tax (annual rate applied to home value, divided by 12)
     const propertyTax = (inputs.homePrice * (inputs.propertyTaxRate / 100)) / 12;
+    
+    // Debug logging for property tax calculation
+    console.log('🔍 Property Tax Debug:');
+    console.log('Home Price:', inputs.homePrice);
+    console.log('Property Tax Rate:', inputs.propertyTaxRate);
+    console.log('Annual Property Tax:', inputs.homePrice * (inputs.propertyTaxRate / 100));
+    console.log('Monthly Property Tax:', propertyTax);
     
     // Insurance (annual cost divided by 12)
     const insurance = inputs.homeInsuranceAnnual / 12;
