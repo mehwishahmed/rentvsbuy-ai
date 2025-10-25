@@ -39,6 +39,117 @@ button:hover {
   border-radius: 3px;
 }
 
+/* Edit mode styles */
+.reference-box-actions {
+  padding: 12px 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(0, 0, 0, 0.1);
+}
+
+.edit-values-btn {
+  background: rgba(30, 41, 59, 0.8);
+  color: white;
+  border: 1px solid rgba(30, 41, 59, 0.5);
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  font-family: 'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif !important;
+  transition: all 0.2s;
+  backdrop-filter: blur(10px);
+}
+
+.edit-values-btn:hover {
+  background: rgba(30, 41, 59, 1);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(30, 41, 59, 0.3);
+}
+
+.edit-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.save-edit-btn {
+  background: rgba(16, 185, 129, 0.8);
+  color: white;
+  border: 1px solid rgba(16, 185, 129, 0.5);
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  font-family: 'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif !important;
+  transition: all 0.2s;
+  backdrop-filter: blur(10px);
+}
+
+.save-edit-btn:hover {
+  background: rgba(16, 185, 129, 1);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
+}
+
+.cancel-edit-btn {
+  background: rgba(239, 68, 68, 0.8);
+  color: white;
+  border: 1px solid rgba(239, 68, 68, 0.5);
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  font-family: 'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif !important;
+  transition: all 0.2s;
+  backdrop-filter: blur(10px);
+}
+
+.cancel-edit-btn:hover {
+  background: rgba(239, 68, 68, 1);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.3);
+}
+
+/* Edit mode input styles */
+.ref-input-container {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ref-input {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+  padding: 6px 8px;
+  color: white;
+  font-size: 14px;
+  font-weight: 500;
+  font-family: 'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif !important;
+  backdrop-filter: blur(10px);
+  transition: all 0.2s;
+}
+
+.ref-input:focus {
+  outline: none;
+  border-color: rgba(16, 185, 129, 0.5);
+  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2);
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.ref-input::placeholder {
+  color: rgba(255, 255, 255, 0.6);
+}
+
 body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;

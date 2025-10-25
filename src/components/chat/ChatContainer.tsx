@@ -100,6 +100,10 @@ const [chartsReady, setChartsReady] = useState(false);
   const [isLocationLocked, setIsLocationLocked] = useState(false); // Track if user made a choice
   const [usingZipData, setUsingZipData] = useState(false); // Track which scenario
   
+  // Edit mode state
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [editableValues, setEditableValues] = useState<UserData | null>(null);
+  
   // Ref for scrolling to charts
   const messagesEndRef = useRef<HTMLDivElement>(null);
   
@@ -286,19 +290,64 @@ const [chartsReady, setChartsReady] = useState(false);
     setShowLocationCard(false);
     setIsLocationLocked(false);
     setUsingZipData(false);
+    setIsEditMode(false);
+    setEditableValues(null);
+  };
+
+  // Edit mode handlers
+  const handleEditValues = () => {
+    setIsEditMode(true);
+    setEditableValues({ ...userData });
+  };
+
+  const handleCancelEdit = () => {
+    setIsEditMode(false);
+    setEditableValues(null);
+  };
+
+  const handleSaveEdit = () => {
+    if (!editableValues) return;
+    
+    // Update user data with edited values
+    setUserData(editableValues);
+    setIsEditMode(false);
+    setEditableValues(null);
+    
+    // Recalculate charts with new values
+    calculateAndShowChart(editableValues, locationData);
+    
+    // Add AI message acknowledging the change
+    const changeMessage: Message = {
+      id: Date.now().toString(),
+      role: 'assistant',
+      content: "Perfect! I've updated your scenario with the new values. The charts have been recalculated to reflect your changes. Feel free to explore how the different scenarios compare!"
+    };
+    setMessages(prev => [...prev, changeMessage]);
   };
 
   const handleUseLocalData = () => {
     if (locationData) {
-      // Add confirmation message first (don't set data yet)
-      const confirmationMessage: Message = {
+      // Set the ZIP data immediately
+      const newUserData: UserData = {
+        homePrice: locationData.medianHomePrice,
+        monthlyRent: locationData.averageRent,
+        downPaymentPercent: null,
+        timeHorizonYears: null
+      };
+      
+      setUserData(newUserData);
+      setIsLocationLocked(true);
+      setUsingZipData(true);
+      
+      // Add AI message asking for down payment and timeline
+      const aiMessage: Message = {
         id: Date.now().toString(),
         role: 'assistant',
-        content: `Great! I found local market data for ${locationData.city}, ${locationData.state}:\n\n🏠 **Home Price:** $${locationData.medianHomePrice.toLocaleString()}\n💵 **Monthly Rent:** $${locationData.averageRent.toLocaleString()}\n🏛️ **Property Tax:** ${(locationData.propertyTaxRate * 100).toFixed(2)}%\n📈 **Rent Growth:** ${(locationData.rentGrowthRate * 100).toFixed(1)}%/year\n🏘️ **Home Appreciation:** ${(locationData.homeAppreciationRate * 100).toFixed(1)}%/year\n\nDo you want to use these values? If yes, I'll just need your down payment percentage and timeline!`
+        content: `Perfect! I'll use the ${locationData.city}, ${locationData.state} market data. Now I just need two more details:\n\n1. What down payment percentage are you thinking? (e.g., 10%, 20%)\n2. How long do you plan to stay in this home? (e.g., 3, 5, 10 years)`
       };
-      setMessages(prev => [...prev, confirmationMessage]);
+      setMessages(prev => [...prev, aiMessage]);
       
-      // Hide the location card so user can respond via chat
+      // Hide the location card
       setShowLocationCard(false);
     }
   };
@@ -341,55 +390,6 @@ function shouldShowChart(aiResponse: string): string | null {
 }
 
   const handleSendMessage = async (content: string) => {
-    // PATH 15: Check if user is confirming ZIP code data usage
-    if (locationData && !isLocationLocked) {
-      const lowerContent = content.toLowerCase();
-      
-      // Check if user is confirming they want to use the ZIP data
-      if (lowerContent.includes('yes') || lowerContent.includes('yeah') || lowerContent.includes('sure') || 
-          lowerContent.includes('use these') || lowerContent.includes('use those') || 
-          lowerContent.includes('use the data') || lowerContent.includes('confirm')) {
-        
-        // Set the ZIP data and lock it
-        const newUserData: UserData = {
-          homePrice: locationData.medianHomePrice,
-          monthlyRent: locationData.averageRent,
-          downPaymentPercent: null,
-          timeHorizonYears: null
-        };
-        
-        setUserData(newUserData);
-        setIsLocationLocked(true);
-        setUsingZipData(true);
-        
-        // Add AI message asking for down payment and timeline
-        const aiMessage: Message = {
-          id: Date.now().toString(),
-          role: 'assistant',
-          content: `Perfect! I'll use the ${locationData.city}, ${locationData.state} market data. Now I just need two more details:\n\n1. What down payment percentage are you thinking? (e.g., 10%, 20%)\n2. How long do you plan to stay in this home? (e.g., 3, 5, 10 years)`
-        };
-        setMessages(prev => [...prev, { id: Date.now().toString(), role: 'user', content }, aiMessage]);
-        return;
-      }
-      
-      // Check if user wants to decline the ZIP data
-      if (lowerContent.includes('no') || lowerContent.includes('nope') || lowerContent.includes('keep my') || 
-          lowerContent.includes('use my own') || lowerContent.includes('custom')) {
-        
-        // Clear location data and continue with custom input
-        setLocationData(null);
-        setShowLocationCard(false);
-        
-        const declineMessage: Message = {
-          id: Date.now().toString(),
-          role: 'assistant',
-          content: "No problem! Let's use your own numbers instead. What home price and monthly rent are you working with?"
-        };
-        setMessages(prev => [...prev, { id: Date.now().toString(), role: 'user', content }, declineMessage]);
-        return;
-      }
-    }
-    
     // PATH 14: Check if user is changing their mind after making a choice
     if (isLocationLocked && locationData) {
       const lowerContent = content.toLowerCase();
@@ -965,31 +965,87 @@ const handleChipClick = (message: string) => {
               <>
                 <div className="reference-item">
                   <span className="ref-label">🏠 Home:</span>
-                  <span className="ref-value">
-                    {userData.homePrice ? `$${userData.homePrice.toLocaleString()}` : '___'} 
-                    <small>({locationData.city})</small>
-                  </span>
+                  {isEditMode ? (
+                    <div className="ref-input-container">
+                      <input
+                        type="number"
+                        value={editableValues?.homePrice || ''}
+                        onChange={(e) => setEditableValues(prev => prev ? {...prev, homePrice: parseInt(e.target.value) || null} : null)}
+                        className="ref-input"
+                        placeholder="Home price"
+                      />
+                      <small>({locationData.city})</small>
+                    </div>
+                  ) : (
+                    <span className="ref-value">
+                      {userData.homePrice ? `$${userData.homePrice.toLocaleString()}` : '___'} 
+                      <small>({locationData.city})</small>
+                    </span>
+                  )}
                 </div>
                 <div className="reference-item">
                   <span className="ref-label">💵 Rent:</span>
-                  <span className="ref-value">
-                    {userData.monthlyRent ? `$${userData.monthlyRent.toLocaleString()}/mo` : '___'} 
-                    <small>({locationData.city})</small>
-                  </span>
+                  {isEditMode ? (
+                    <div className="ref-input-container">
+                      <input
+                        type="number"
+                        value={editableValues?.monthlyRent || ''}
+                        onChange={(e) => setEditableValues(prev => prev ? {...prev, monthlyRent: parseInt(e.target.value) || null} : null)}
+                        className="ref-input"
+                        placeholder="Monthly rent"
+                      />
+                      <small>({locationData.city})</small>
+                    </div>
+                  ) : (
+                    <span className="ref-value">
+                      {userData.monthlyRent ? `$${userData.monthlyRent.toLocaleString()}/mo` : '___'} 
+                      <small>({locationData.city})</small>
+                    </span>
+                  )}
                 </div>
                 <div className="reference-item">
                   <span className="ref-label">💰 Down:</span>
-                  <span className="ref-value">
-                    {userData.downPaymentPercent ? `${userData.downPaymentPercent}%` : '___'} 
-                    <small>(you chose)</small>
-                  </span>
+                  {isEditMode ? (
+                    <div className="ref-input-container">
+                      <input
+                        type="number"
+                        value={editableValues?.downPaymentPercent || ''}
+                        onChange={(e) => setEditableValues(prev => prev ? {...prev, downPaymentPercent: parseInt(e.target.value) || null} : null)}
+                        className="ref-input"
+                        placeholder="Down payment %"
+                        min="1"
+                        max="100"
+                      />
+                      <small>(you chose)</small>
+                    </div>
+                  ) : (
+                    <span className="ref-value">
+                      {userData.downPaymentPercent ? `${userData.downPaymentPercent}%` : '___'} 
+                      <small>(you chose)</small>
+                    </span>
+                  )}
                 </div>
                 <div className="reference-item">
                   <span className="ref-label">⏰ Timeline:</span>
-                  <span className="ref-value">
-                    {userData.timeHorizonYears ? `${userData.timeHorizonYears} years` : '___'} 
-                    <small>(you chose)</small>
-                  </span>
+                  {isEditMode ? (
+                    <div className="ref-input-container">
+                      <input
+                        type="number"
+                        value={editableValues?.timeHorizonYears || ''}
+                        onChange={(e) => setEditableValues(prev => prev ? {...prev, timeHorizonYears: parseInt(e.target.value) || null} : null)}
+                        className="ref-input"
+                        placeholder="Years"
+                        min="1"
+                        max="30"
+                      />
+                      <small>(you chose)</small>
+                    </div>
+                  ) : (
+                    <span className="ref-value">
+                      {userData.timeHorizonYears ? `${userData.timeHorizonYears} years` : '___'} 
+                      <small>(you chose)</small>
+                    </span>
+                  )}
                 </div>
                 <div className="reference-item">
                   <span className="ref-label">🏛️ Tax:</span>
@@ -1023,31 +1079,87 @@ const handleChipClick = (message: string) => {
               <>
                 <div className="reference-item">
                   <span className="ref-label">🏠 Home:</span>
-                  <span className="ref-value">
-                    {userData.homePrice ? `$${userData.homePrice.toLocaleString()}` : '___'} 
-                    <small>(you chose)</small>
-                  </span>
+                  {isEditMode ? (
+                    <div className="ref-input-container">
+                      <input
+                        type="number"
+                        value={editableValues?.homePrice || ''}
+                        onChange={(e) => setEditableValues(prev => prev ? {...prev, homePrice: parseInt(e.target.value) || null} : null)}
+                        className="ref-input"
+                        placeholder="Home price"
+                      />
+                      <small>(you chose)</small>
+                    </div>
+                  ) : (
+                    <span className="ref-value">
+                      {userData.homePrice ? `$${userData.homePrice.toLocaleString()}` : '___'} 
+                      <small>(you chose)</small>
+                    </span>
+                  )}
                 </div>
                 <div className="reference-item">
                   <span className="ref-label">💵 Rent:</span>
-                  <span className="ref-value">
-                    {userData.monthlyRent ? `$${userData.monthlyRent.toLocaleString()}/mo` : '___'} 
-                    <small>(you chose)</small>
-                  </span>
+                  {isEditMode ? (
+                    <div className="ref-input-container">
+                      <input
+                        type="number"
+                        value={editableValues?.monthlyRent || ''}
+                        onChange={(e) => setEditableValues(prev => prev ? {...prev, monthlyRent: parseInt(e.target.value) || null} : null)}
+                        className="ref-input"
+                        placeholder="Monthly rent"
+                      />
+                      <small>(you chose)</small>
+                    </div>
+                  ) : (
+                    <span className="ref-value">
+                      {userData.monthlyRent ? `$${userData.monthlyRent.toLocaleString()}/mo` : '___'} 
+                      <small>(you chose)</small>
+                    </span>
+                  )}
                 </div>
                 <div className="reference-item">
                   <span className="ref-label">💰 Down:</span>
-                  <span className="ref-value">
-                    {userData.downPaymentPercent ? `${userData.downPaymentPercent}%` : '___'} 
-                    <small>(you chose)</small>
-                  </span>
+                  {isEditMode ? (
+                    <div className="ref-input-container">
+                      <input
+                        type="number"
+                        value={editableValues?.downPaymentPercent || ''}
+                        onChange={(e) => setEditableValues(prev => prev ? {...prev, downPaymentPercent: parseInt(e.target.value) || null} : null)}
+                        className="ref-input"
+                        placeholder="Down payment %"
+                        min="1"
+                        max="100"
+                      />
+                      <small>(you chose)</small>
+                    </div>
+                  ) : (
+                    <span className="ref-value">
+                      {userData.downPaymentPercent ? `${userData.downPaymentPercent}%` : '___'} 
+                      <small>(you chose)</small>
+                    </span>
+                  )}
                 </div>
                 <div className="reference-item">
                   <span className="ref-label">⏰ Timeline:</span>
-                  <span className="ref-value">
-                    {userData.timeHorizonYears ? `${userData.timeHorizonYears} years` : '___'} 
-                    <small>(you chose)</small>
-                  </span>
+                  {isEditMode ? (
+                    <div className="ref-input-container">
+                      <input
+                        type="number"
+                        value={editableValues?.timeHorizonYears || ''}
+                        onChange={(e) => setEditableValues(prev => prev ? {...prev, timeHorizonYears: parseInt(e.target.value) || null} : null)}
+                        className="ref-input"
+                        placeholder="Years"
+                        min="1"
+                        max="30"
+                      />
+                      <small>(you chose)</small>
+                    </div>
+                  ) : (
+                    <span className="ref-value">
+                      {userData.timeHorizonYears ? `${userData.timeHorizonYears} years` : '___'} 
+                      <small>(you chose)</small>
+                    </span>
+                  )}
                 </div>
                 <div className="reference-item">
                   <span className="ref-label">🏛️ Tax:</span>
@@ -1076,6 +1188,33 @@ const handleChipClick = (message: string) => {
                   </span>
                 </div>
               </>
+            )}
+          </div>
+          
+          {/* Edit Mode Buttons */}
+          <div className="reference-box-actions">
+            {!isEditMode ? (
+              <button 
+                className="edit-values-btn"
+                onClick={handleEditValues}
+              >
+                ✏️ Edit Values
+              </button>
+            ) : (
+              <div className="edit-actions">
+                <button 
+                  className="save-edit-btn"
+                  onClick={handleSaveEdit}
+                >
+                  💾 Save Changes
+                </button>
+                <button 
+                  className="cancel-edit-btn"
+                  onClick={handleCancelEdit}
+                >
+                  ❌ Cancel
+                </button>
+              </div>
             )}
           </div>
         </div>
