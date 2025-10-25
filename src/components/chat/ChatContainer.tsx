@@ -59,7 +59,7 @@ export function ChatContainer() {
     {
       id: '1',
       role: 'assistant',
-      content: "Hi! I'm here to help you figure out whether buying or renting makes more financial sense for you. To get started, tell me: what's the home price you're considering and your current monthly rent?"
+      content: "Hi! I'm here to help you figure out whether buying or renting makes more financial sense for you. To get started, tell me: what's the home price you're considering and your current monthly rent?\n\n💡 **Tip:** You can also just type in a ZIP code (like 90210) and I'll use local market data for that area!"
     }
   ]);
   
