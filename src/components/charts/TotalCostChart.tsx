@@ -2,12 +2,15 @@
 // total costs chart
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from 'recharts';
 import type { AnalysisResult } from '../../types/calculator';
+import { getChartColors } from '../../lib/charts/exportChartColors';
 
 interface TotalCostChartProps {
   analysis: AnalysisResult;
+  isExport?: boolean;
 }
 
-export function TotalCostChart({ analysis }: TotalCostChartProps) {
+export function TotalCostChart({ analysis, isExport }: TotalCostChartProps) {
+  const colors = getChartColors(isExport);
   // Safety checks
   if (!analysis || !analysis.timeline || analysis.timeline.length === 0) {
     console.error('❌ [TotalCostChart] Invalid analysis data:', { analysis });
@@ -62,8 +65,8 @@ export function TotalCostChart({ analysis }: TotalCostChartProps) {
       
       <ResponsiveContainer width="100%" height={300}>
         <BarChart data={data} margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="rgba(139, 92, 246, 0.2)" />
-          <XAxis dataKey="name" stroke="rgba(255, 255, 255, 0.7)" />
+          <CartesianGrid strokeDasharray="3 3" stroke={colors.grid} />
+          <XAxis dataKey="name" stroke={colors.axis} tick={{ fill: colors.text }} />
           <YAxis 
             label={{ value: 'Net Cost ($)', angle: -90, position: 'insideLeft' }}
             tickFormatter={(value) => {
@@ -74,16 +77,17 @@ export function TotalCostChart({ analysis }: TotalCostChartProps) {
               }
               return `$${value}`;
             }}
-            stroke="rgba(255, 255, 255, 0.7)"
+            stroke={colors.axis}
+            tick={{ fill: colors.text }}
           />
           <Tooltip 
             formatter={(value: number) => `$${value.toLocaleString()}`}
-            contentStyle={{ backgroundColor: 'rgba(5, 8, 15, 0.85)', border: '1px solid rgba(124, 95, 196, 0.35)', borderRadius: '10px', color: '#f1f5f9', backdropFilter: 'blur(6px)' }}
+            contentStyle={{ backgroundColor: colors.tooltipBg, border: `1px solid ${colors.tooltipBorder}`, borderRadius: '10px', color: colors.tooltipText }}
           />
-          <Legend wrapperStyle={{ color: 'rgba(255, 255, 255, 0.9)' }} />
+          <Legend wrapperStyle={{ color: colors.text }} />
           <Bar dataKey="netCost" name={`Net Cost (after ${timelineYears} years)`} radius={[8, 8, 0, 0]}>
-            <Cell fill="rgba(124, 95, 196, 0.55)" />
-            <Cell fill="rgba(80, 140, 210, 0.5)" />
+            <Cell fill={colors.bar1} />
+            <Cell fill={colors.bar2} />
           </Bar>
         </BarChart>
       </ResponsiveContainer>

@@ -6,16 +6,12 @@ interface RecommendationCardProps {
   recommendation: Recommendation;
   location?: string; // e.g., "Poway, CA" or "San Diego"
   timeline: number;
-  onShowDetails: () => void;
-  onTryNewScenario: () => void;
 }
 
 export const RecommendationCard: React.FC<RecommendationCardProps> = ({
   recommendation,
   location,
-  timeline,
-  onShowDetails,
-  onTryNewScenario
+  timeline
 }) => {
   const { verdict, savings, monthlyDifference, breakEvenYear, reasoning } = recommendation;
   
@@ -24,6 +20,9 @@ export const RecommendationCard: React.FC<RecommendationCardProps> = ({
   
   return (
     <div className="recommendation-card">
+      <div className="recommendation-intro">
+        Thank you for your info! Based on your results:
+      </div>
       <div className="recommendation-header">
         <span className="recommendation-icon">{verdictIcon}</span>
         <h2 className="recommendation-verdict" style={{ color: verdictColor }}>
@@ -64,20 +63,6 @@ export const RecommendationCard: React.FC<RecommendationCardProps> = ({
         <p className="recommendation-reasoning">{reasoning}</p>
       </div>
       
-      <div className="recommendation-actions">
-        <button 
-          className="btn-primary" 
-          onClick={onShowDetails}
-        >
-          See Why
-        </button>
-        <button 
-          className="btn-secondary" 
-          onClick={onTryNewScenario}
-        >
-          Try Different Numbers
-        </button>
-      </div>
     </div>
   );
 };

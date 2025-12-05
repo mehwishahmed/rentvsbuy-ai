@@ -244,3 +244,18 @@ class ChartInsightRequest(BaseModel):
 
 class ChartInsightResponse(BaseModel):
     answer: str
+
+
+class SummaryInsightRequest(BaseModel):
+    zipCode: Optional[str] = None
+    timelineYears: int
+    buyNetWorth: List[float]
+    rentNetWorth: List[float]
+    breakEvenYear: Optional[int] = None
+    finalDelta: float
+    homeAppreciationRate: float
+    rentGrowthRate: float
+
+
+class SummaryInsightResponse(BaseModel):
+    insight: str

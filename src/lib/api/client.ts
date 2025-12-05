@@ -25,6 +25,10 @@ export async function apiFetch<T>(path: string, init: RequestInit, timeout = 600
     if (error.name === 'AbortError') {
       throw new Error(`Request to ${path} timed out after ${timeout / 1000} seconds. The backend may be processing heavy calculations.`);
     }
+    // Handle network errors (Load failed, Failed to fetch, etc.)
+    if (error.message?.includes('Load failed') || error.message?.includes('Failed to fetch') || error.name === 'TypeError') {
+      throw new Error(`Network error: Unable to connect to backend. Please check if the backend is running at ${API_BASE_URL}.`);
+    }
     throw error;
   }
 }

@@ -2,12 +2,15 @@
 
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import type { TimelinePoint } from '../../types/calculator';
+import { getChartColors } from '../../lib/charts/exportChartColors';
 
 interface EquityBuildupChartProps {
   timeline: TimelinePoint[];
+  isExport?: boolean;
 }
 
-export function EquityBuildupChart({ timeline }: EquityBuildupChartProps) {
+export function EquityBuildupChart({ timeline, isExport }: EquityBuildupChartProps) {
+  const colors = getChartColors(isExport);
   // Transform data - show every year
   const chartData = timeline
     .filter((_, index) => index % 12 === 0 || index === timeline.length - 1)
@@ -33,11 +36,12 @@ export function EquityBuildupChart({ timeline }: EquityBuildupChartProps) {
       
       <ResponsiveContainer width="100%" height={300}>
         <LineChart data={chartData}>
-          <CartesianGrid strokeDasharray="3 3" stroke="rgba(139, 92, 246, 0.2)" />
+          <CartesianGrid strokeDasharray="3 3" stroke={colors.grid} />
           <XAxis 
             dataKey="year" 
             label={{ value: 'Years', position: 'insideBottom', offset: -5 }}
-            stroke="rgba(255, 255, 255, 0.7)"
+            stroke={colors.axis}
+            tick={{ fill: colors.text }}
           />
           <YAxis 
             label={{ value: 'Home Equity ($)', angle: -90, position: 'insideLeft' }}
@@ -49,7 +53,8 @@ export function EquityBuildupChart({ timeline }: EquityBuildupChartProps) {
               }
               return `$${value}`;
             }}
-            stroke="rgba(255, 255, 255, 0.7)"
+            stroke={colors.axis}
+            tick={{ fill: colors.text }}
           />
           <Tooltip 
             formatter={(value: number, name: string) => {
@@ -59,13 +64,13 @@ export function EquityBuildupChart({ timeline }: EquityBuildupChartProps) {
               return value;
             }}
             labelFormatter={(label) => `Year ${label}`}
-            contentStyle={{ backgroundColor: 'rgba(5, 8, 15, 0.85)', border: '1px solid rgba(124, 95, 196, 0.35)', borderRadius: '10px', color: '#f1f5f9', backdropFilter: 'blur(6px)' }}
+            contentStyle={{ backgroundColor: colors.tooltipBg, border: `1px solid ${colors.tooltipBorder}`, borderRadius: '10px', color: colors.tooltipText }}
           />
-          <Legend wrapperStyle={{ color: 'rgba(255, 255, 255, 0.9)' }} />
+          <Legend wrapperStyle={{ color: colors.text }} />
           <Line 
             type="monotone" 
             dataKey="equity" 
-            stroke="rgba(124, 95, 196, 0.65)" 
+            stroke={colors.line1} 
             strokeWidth={3}
             name="Home Equity"
             dot={false}

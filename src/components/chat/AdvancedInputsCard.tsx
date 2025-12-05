@@ -35,15 +35,18 @@ const phaseLabelStyle: React.CSSProperties = {
 };
 
 const fieldGridStyle: React.CSSProperties = {
-  display: 'grid',
-  gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+  display: 'flex',
+  flexDirection: 'row',
   gap: '12px',
+  minWidth: 'max-content',
 };
 
 const expandedScrollStyle: React.CSSProperties = {
   marginTop: '16px',
-  maxHeight: '420px',
-  overflowY: 'auto',
+  maxWidth: '100%',
+  overflowX: 'auto',
+  overflowY: 'visible',
+  paddingBottom: '6px',
   paddingRight: '6px',
 };
 
@@ -52,6 +55,8 @@ const fieldCardStyle: React.CSSProperties = {
   borderRadius: '12px',
   padding: '12px',
   background: 'rgba(255,255,255,0.02)',
+  minWidth: '220px',
+  flexShrink: 0,
 };
 
 const fieldLabelStyle: React.CSSProperties = {

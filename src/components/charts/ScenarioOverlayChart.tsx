@@ -3,9 +3,10 @@ import type { ScenarioInputs, ScenarioResult } from '../../types/calculator';
 
 interface ScenarioOverlayChartProps {
   scenarios: ScenarioResult[];
+  isExport?: boolean;
 }
 
-export function ScenarioOverlayChart({ scenarios }: ScenarioOverlayChartProps) {
+export function ScenarioOverlayChart({ scenarios, isExport }: ScenarioOverlayChartProps) {
   if (!scenarios || scenarios.length === 0) {
     return (
       <div className="chart-container">

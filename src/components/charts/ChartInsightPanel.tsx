@@ -40,6 +40,18 @@ export function ChartInsightPanel({
     }
   };
 
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    // Submit on Enter, but allow Shift+Enter for new lines
+    if (event.key === 'Enter' && !event.shiftKey) {
+      event.preventDefault();
+      const trimmed = question.trim();
+      if (trimmed && !isLoading) {
+        onSubmit(trimmed);
+        setQuestion('');
+      }
+    }
+  };
+
   return (
     <div
       className="chart-insight-panel"
@@ -67,7 +79,7 @@ export function ChartInsightPanel({
       {conversation.length > 0 && (
         <div className="chart-insight-conversation">
           {conversation.map((msg, idx) => (
-            <div key={idx} className="chart-insight-message">
+            <div key={`${msg.question}-${idx}`} className="chart-insight-message">
               <div className="chart-insight-question">
                 <strong>Q:</strong> {msg.question}
               </div>
@@ -90,6 +102,7 @@ export function ChartInsightPanel({
             : "Ask a follow-up question..."}
           value={question}
           onChange={(event) => setQuestion(event.target.value)}
+          onKeyDown={handleKeyDown}
           disabled={isLoading}
         />
         <button type="submit" disabled={isLoading || question.trim().length === 0}>

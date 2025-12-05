@@ -16,7 +16,8 @@ from .finance.calculator import (
     calculate_tax_savings, calculate_sensitivity, calculate_scenarios, calculate_heatmap, calculate_monte_carlo)
 from .models import (
     AnalysisRequest, AnalysisResponse, TimelinePoint, ScenarioRequest, SensitivityRequest,
-    HeatmapRequest, MonteCarloRequest, HomePricePathSummary, ChartInsightRequest, ChartInsightResponse
+    HeatmapRequest, MonteCarloRequest, HomePricePathSummary, ChartInsightRequest, ChartInsightResponse,
+    SummaryInsightRequest, SummaryInsightResponse
 )
 from .services.openai_service import OpenAIService
 
@@ -357,6 +358,73 @@ def chart_insight_endpoint(
             "X-Accel-Buffering": "no",
         },
     )
+
+@app.post(f"{settings.api_prefix}/finance/summary-insight", response_model=SummaryInsightResponse)
+def summary_insight_endpoint(
+    request: SummaryInsightRequest, openai_service: OpenAIService = Depends(get_openai_service)
+) -> SummaryInsightResponse:
+    """Generate a natural-language summary explaining the net worth comparison scenario."""
+    try:
+        # Build context for the prompt
+        location_context = ""
+        if request.zipCode:
+            location_context = f" in ZIP code {request.zipCode}"
+        
+        break_even_text = ""
+        if request.breakEvenYear:
+            break_even_text = f"Buying becomes financially advantageous starting in year {request.breakEvenYear}. "
+        else:
+            break_even_text = "Within your time horizon, there is no clear break-even point where buying becomes financially advantageous. "
+        
+        winner_text = ""
+        if request.finalDelta > 0:
+            winner_text = f"By the end of your {request.timelineYears}-year timeline, buying puts you ahead by ${abs(request.finalDelta):,.0f} in net worth compared to renting."
+        else:
+            winner_text = f"By the end of your {request.timelineYears}-year timeline, renting puts you ahead by ${abs(request.finalDelta):,.0f} in net worth compared to buying."
+        
+        # Build the prompt
+        prompt = f"""You are a friendly financial advisor explaining a rent-vs-buy analysis to someone considering purchasing a home{location_context}.
+
+Based on the analysis results:
+- Timeline: {request.timelineYears} years
+- {break_even_text}
+- {winner_text}
+- Home appreciation rate: {request.homeAppreciationRate:.1f}% per year
+- Rent growth rate: {request.rentGrowthRate:.1f}% per year
+
+The net worth comparison chart shows how the buyer's and renter's net worth evolve over time. The buyer's line includes home equity buildup and appreciation, while the renter's line shows invested savings growth.
+
+Write a clear, conversational 3-4 sentence summary that:
+1. Explains what the chart shows in plain English
+2. Mentions the break-even point (if applicable)
+3. Highlights which option is better financially and by how much
+4. Mentions the growth assumptions in a natural way
+
+Keep it friendly, accessible, and avoid jargon. Write as if you're talking to a friend who's making a big decision."""
+
+        response_text = openai_service.chat_completion(
+            model="gpt-4o-mini",
+            messages=[
+                {
+                    "role": "system",
+                    "content": "You are a helpful financial advisor who explains complex financial scenarios in simple, friendly language."
+                },
+                {
+                    "role": "user",
+                    "content": prompt
+                }
+            ],
+            temperature=0.7,
+            max_tokens=300,
+        )
+        
+        return SummaryInsightResponse(insight=response_text)
+    except Exception as e:
+        # Return a safe fallback message
+        return SummaryInsightResponse(
+            insight="Sorry, I couldn't generate a summary right now. Please try again."
+        )
+
 
 @app.post(f"{settings.api_prefix}/ai/chat")
 def chat_completion(

@@ -20,13 +20,14 @@ export function analyzeScenario(
 }
 
 export function fetchBreakEvenHeatmap(params: HeatmapParams): Promise<BreakEvenHeatmapPoint[]> {
+  // Heatmap can take longer - 120 seconds timeout
   return apiFetch<BreakEvenHeatmapPoint[]>('/api/finance/heatmap', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json'
     },
     body: JSON.stringify(params)
-  });
+  }, 120000); // 120 second timeout
 }
 
 export function fetchMonteCarlo(inputs: ScenarioInputs, runs = 500): Promise<MonteCarloResponse> {
@@ -40,23 +41,25 @@ export function fetchMonteCarlo(inputs: ScenarioInputs, runs = 500): Promise<Mon
 }
 
 export function fetchSensitivity(request: SensitivityRequest): Promise<SensitivityResult[]> {
+  // Sensitivity analysis can take longer - 120 seconds timeout
   return apiFetch<SensitivityResult[]>('/api/finance/sensitivity', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json'
     },
     body: JSON.stringify(request)
-  });
+  }, 120000); // 120 second timeout
 }
 
 export function fetchScenarios(request: ScenarioRequest): Promise<ScenarioResult[]> {
+  // Scenario overlay can take longer - 120 seconds timeout
   return apiFetch<ScenarioResult[]>('/api/finance/scenarios', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json'
     },
     body: JSON.stringify(request)
-  });
+  }, 120000); // 120 second timeout
 }
 
 export interface ChartInsightPayload {
@@ -142,7 +145,8 @@ export function fetchChartInsightStream(
     })
     .catch((error) => {
       if (error.name !== 'AbortError') {
-        onError?.(error);
+        console.error('[Chart Insight] Error:', error);
+        onError?.(error instanceof Error ? error : new Error(error?.message || 'Failed to fetch insight'));
       }
     });
   
@@ -153,4 +157,29 @@ export interface HeatmapParams {
   base: ScenarioInputs;
   timelines: number[];
   downPayments: number[];
+}
+
+export interface SummaryInsightRequest {
+  zipCode?: string;
+  timelineYears: number;
+  buyNetWorth: number[];
+  rentNetWorth: number[];
+  breakEvenYear?: number;
+  finalDelta: number;
+  homeAppreciationRate: number;
+  rentGrowthRate: number;
+}
+
+export interface SummaryInsightResponse {
+  insight: string;
+}
+
+export function generateSummaryInsight(request: SummaryInsightRequest): Promise<SummaryInsightResponse> {
+  return apiFetch<SummaryInsightResponse>('/api/finance/summary-insight', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(request)
+  });
 }

@@ -2,12 +2,15 @@
 
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from 'recharts';
 import type { TimelinePoint } from '../../types/calculator';
+import { getChartColors, getChartContainerStyles, getChartTitleStyles, getChartCaptionStyles } from '../../lib/charts/exportChartColors';
 
 interface MonthlyCostChartProps {
   timeline: TimelinePoint[];
+  isExport?: boolean;
 }
 
-export function MonthlyCostChart({ timeline }: MonthlyCostChartProps) {
+export function MonthlyCostChart({ timeline, isExport }: MonthlyCostChartProps) {
+  const colors = getChartColors(isExport);
   // Use first month's data for monthly costs
   const firstPoint = timeline[0];
   
@@ -30,26 +33,30 @@ export function MonthlyCostChart({ timeline }: MonthlyCostChartProps) {
     {
       name: 'Buying',
       total: Math.round(buyingCosts.total),
-      color: 'rgba(124, 95, 196, 0.55)'
+      color: colors.bar1
     },
     {
       name: 'Renting',
       total: Math.round(rentingCosts.total),
-      color: 'rgba(80, 140, 210, 0.5)'
+      color: colors.bar2
     }
   ];
   
+  const containerStyles = getChartContainerStyles(isExport);
+  const titleStyles = getChartTitleStyles(isExport);
+  const captionStyles = getChartCaptionStyles(isExport);
+  
   return (
-    <div className="chart-container">
-      <h3 className="chart-title">Monthly Cost Comparison</h3>
-      <p className="chart-caption" style={{ marginBottom: '16px', fontSize: '14px', color: 'rgba(255, 255, 255, 0.7)', lineHeight: '1.5' }}>
+    <div className="chart-container" style={containerStyles}>
+      <h3 className="chart-title" style={titleStyles}>Monthly Cost Comparison</h3>
+      <p className="chart-caption" style={{ marginBottom: '16px', fontSize: '14px', lineHeight: '1.5', ...captionStyles }}>
         This compares your monthly cost of buying (mortgage + taxes + other costs) versus renting. Lower bars are better.
       </p>
       
       <ResponsiveContainer width="100%" height={280}>
         <BarChart data={data}>
-          <CartesianGrid strokeDasharray="3 3" stroke="rgba(139, 92, 246, 0.2)" />
-          <XAxis dataKey="name" stroke="rgba(255, 255, 255, 0.7)" />
+          <CartesianGrid strokeDasharray="3 3" stroke={colors.grid} />
+          <XAxis dataKey="name" stroke={colors.axis} tick={{ fill: colors.text }} />
           <YAxis 
             tickFormatter={(value) => {
               if (value >= 1000000) {
@@ -59,13 +66,14 @@ export function MonthlyCostChart({ timeline }: MonthlyCostChartProps) {
               }
               return `$${value}`;
             }}
-            stroke="rgba(255, 255, 255, 0.7)"
+            stroke={colors.axis}
+            tick={{ fill: colors.text }}
           />
           <Tooltip 
             formatter={(value: number) => `$${value.toLocaleString()}`}
-            contentStyle={{ backgroundColor: 'rgba(5, 8, 15, 0.85)', border: '1px solid rgba(124, 95, 196, 0.35)', borderRadius: '10px', color: '#f1f5f9', backdropFilter: 'blur(6px)' }}
+            contentStyle={{ backgroundColor: colors.tooltipBg, border: `1px solid ${colors.tooltipBorder}`, borderRadius: '10px', color: colors.tooltipText }}
           />
-          <Legend wrapperStyle={{ color: 'rgba(255, 255, 255, 0.9)' }} />
+          <Legend wrapperStyle={{ color: colors.text }} />
           <Bar dataKey="total" name="Monthly Cost" radius={[8, 8, 0, 0]}>
             {data.map((entry, index) => (
               <Cell key={`cell-${index}`} fill={entry.color} />

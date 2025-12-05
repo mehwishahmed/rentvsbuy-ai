@@ -1,11 +1,14 @@
 import { Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Area, AreaChart } from 'recharts';
 import type { HomePricePathSummary } from '../../types/calculator';
+import { getChartColors } from '../../lib/charts/exportChartColors';
 
 interface MonteCarloChartProps {
   monteCarloHomePrices?: HomePricePathSummary | null;
+  isExport?: boolean;
 }
 
-export function MonteCarloChart({ monteCarloHomePrices }: MonteCarloChartProps) {
+export function MonteCarloChart({ monteCarloHomePrices, isExport }: MonteCarloChartProps) {
+  const colors = getChartColors(isExport);
   console.log('🎲 [MC DEBUG] MonteCarloChart render:', {
     hasProps: !!monteCarloHomePrices,
     hasYears: !!monteCarloHomePrices?.years,
@@ -67,15 +70,17 @@ export function MonteCarloChart({ monteCarloHomePrices }: MonteCarloChartProps) 
       <ResponsiveContainer width="100%" height={300}>
         <AreaChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
           <defs>
-            <linearGradient id="colorBand" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="#3182ce" stopOpacity={0.3}/>
-              <stop offset="95%" stopColor="#3182ce" stopOpacity={0.1}/>
+            <linearGradient id={`colorBand-${isExport ? 'export' : 'normal'}`} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="5%" stopColor={isExport ? colors.areaFill : '#3182ce'} stopOpacity={isExport ? 1 : 0.3}/>
+              <stop offset="95%" stopColor={isExport ? colors.areaFillLight : '#3182ce'} stopOpacity={isExport ? 1 : 0.1}/>
             </linearGradient>
           </defs>
-          <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
+          <CartesianGrid strokeDasharray="3 3" stroke={colors.grid} />
           <XAxis 
             dataKey="year" 
             label={{ value: 'Years', position: 'insideBottom', offset: -5 }}
+            stroke={colors.axis}
+            tick={{ fill: colors.text }}
           />
           <YAxis 
             label={{ value: 'Home Value ($)', angle: -90, position: 'insideLeft' }}
@@ -87,28 +92,30 @@ export function MonteCarloChart({ monteCarloHomePrices }: MonteCarloChartProps) 
               }
               return `$${value}`;
             }}
+            stroke={colors.axis}
+            tick={{ fill: colors.text }}
           />
           <Tooltip 
             formatter={(value: number) => `$${value.toLocaleString()}`}
-            contentStyle={{ backgroundColor: 'rgba(5, 8, 15, 0.85)', border: '1px solid rgba(124, 95, 196, 0.35)', borderRadius: '10px', color: '#f1f5f9', backdropFilter: 'blur(6px)' }}
+            contentStyle={{ backgroundColor: colors.tooltipBg, border: `1px solid ${colors.tooltipBorder}`, borderRadius: '10px', color: colors.tooltipText }}
             labelFormatter={(year) => `Year ${year}`}
           />
-          <Legend />
+          <Legend wrapperStyle={{ color: colors.text }} />
           
           {/* Shaded area between p10 and p90 */}
           <Area
             type="monotone"
             dataKey="p90"
             stroke="none"
-            fill="url(#colorBand)"
-            fillOpacity={0.3}
+            fill={isExport ? colors.areaFill : `url(#colorBand-${isExport ? 'export' : 'normal'})`}
+            fillOpacity={isExport ? 1 : 0.3}
             connectNulls
           />
           <Area
             type="monotone"
             dataKey="p10"
             stroke="none"
-            fill="#fff"
+            fill={isExport ? colors.background : '#fff'}
             fillOpacity={1}
             connectNulls
           />
@@ -117,7 +124,7 @@ export function MonteCarloChart({ monteCarloHomePrices }: MonteCarloChartProps) 
           <Line 
             type="monotone" 
             dataKey="p50" 
-            stroke="#38a169" 
+            stroke={colors.line3} 
             strokeWidth={3}
             dot={false}
             name="Median (50th percentile)"
@@ -127,7 +134,7 @@ export function MonteCarloChart({ monteCarloHomePrices }: MonteCarloChartProps) 
           <Line 
             type="monotone" 
             dataKey="p90" 
-            stroke="#3182ce" 
+            stroke={colors.line4} 
             strokeWidth={2}
             strokeDasharray="5 5"
             dot={false}
@@ -136,7 +143,7 @@ export function MonteCarloChart({ monteCarloHomePrices }: MonteCarloChartProps) 
           <Line 
             type="monotone" 
             dataKey="p10" 
-            stroke="#e53e3e" 
+            stroke={colors.line5} 
             strokeWidth={2}
             strokeDasharray="5 5"
             dot={false}
