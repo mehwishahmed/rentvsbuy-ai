@@ -26,6 +26,9 @@ backend/.env
 .env
 .env
 
+# iCloud sync files
+*.icloud
+
 # Large data files
 src/data/*.csv
 backend/app/ml/models/*.joblib
