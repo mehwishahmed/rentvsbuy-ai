@@ -203,73 +203,19 @@ export function OnboardingTour({ activeTab }: OnboardingTourProps) {
 
   return (
     <>
+      {/* Help and About buttons moved to banner - keeping hidden buttons for tour functionality */}
       <button
         type="button"
         onClick={handleReplay}
         title="Replay the quick tutorial"
         style={{
           position: 'fixed',
-          top: '20px',
-          right: '20px',
-          zIndex: 10003,
-          padding: '10px 18px',
-          borderRadius: '999px',
-          border: 'none',
-          background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.9) 0%, rgba(59, 130, 246, 0.9) 100%)',
-          color: 'white',
-          fontSize: '13px',
-          fontWeight: 600,
-          letterSpacing: '0.04em',
-          textTransform: 'uppercase',
-          cursor: 'pointer',
-          backdropFilter: 'blur(12px)',
-          boxShadow: '0 4px 12px rgba(139, 92, 246, 0.3)',
-          transition: 'all 0.2s',
-        }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.transform = 'translateY(-2px)';
-          e.currentTarget.style.boxShadow = '0 6px 16px rgba(139, 92, 246, 0.4)';
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.transform = 'translateY(0)';
-          e.currentTarget.style.boxShadow = '0 4px 12px rgba(139, 92, 246, 0.3)';
+          top: '-9999px',
+          left: '-9999px',
+          visibility: 'hidden',
         }}
       >
         Help
-      </button>
-      <button
-        type="button"
-        onClick={() => setShowAbout(true)}
-        title="About RentVsBuy.ai"
-        style={{
-          position: 'fixed',
-          top: '80px',
-          right: '20px',
-          zIndex: 10003,
-          padding: '10px 18px',
-          borderRadius: '999px',
-          border: 'none',
-          background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.9) 0%, rgba(59, 130, 246, 0.9) 100%)',
-          color: 'white',
-          fontSize: '13px',
-          fontWeight: 600,
-          letterSpacing: '0.04em',
-          textTransform: 'uppercase',
-          cursor: 'pointer',
-          backdropFilter: 'blur(12px)',
-          boxShadow: '0 4px 12px rgba(139, 92, 246, 0.3)',
-          transition: 'all 0.2s',
-        }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.transform = 'translateY(-2px)';
-          e.currentTarget.style.boxShadow = '0 6px 16px rgba(139, 92, 246, 0.4)';
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.transform = 'translateY(0)';
-          e.currentTarget.style.boxShadow = '0 4px 12px rgba(139, 92, 246, 0.3)';
-        }}
-      >
-        About
       </button>
 
       {showAbout && (

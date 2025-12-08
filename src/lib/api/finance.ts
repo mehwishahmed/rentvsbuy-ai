@@ -1,5 +1,5 @@
 import type { AnalysisResponse, ScenarioInputs, BreakEvenHeatmapPoint, MonteCarloResponse, SensitivityRequest, SensitivityResult, ScenarioRequest, ScenarioResult } from '../../types/calculator';
-import { apiFetch, API_BASE_URL } from './client';
+import { apiFetch, ensureConfigLoaded } from './client';
 
 export function analyzeScenario(
   inputs: ScenarioInputs,
@@ -91,14 +91,18 @@ export function fetchChartInsightStream(
 ): () => void {
   const controller = new AbortController();
   
-  fetch(`${API_BASE_URL}/api/finance/chart-insight`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(payload),
-    signal: controller.signal,
-  })
+  // Ensure config is loaded before making the request
+  ensureConfigLoaded()
+    .then(baseUrl => {
+      return fetch(`${baseUrl}/api/finance/chart-insight`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+        signal: controller.signal,
+      });
+    })
     .then(async (response) => {
       if (!response.ok) {
         throw new Error(`Request failed: ${response.status}`);

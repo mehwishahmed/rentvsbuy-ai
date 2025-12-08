@@ -23,6 +23,14 @@ class ScenarioInputs(BaseModel):
     homeAppreciationRate: float = Field(..., ge=-100)
     rentGrowthRate: float = Field(..., ge=-100)
     investmentReturnRate: float = Field(..., ge=-100)
+    # Optional additional costs
+    closingCostsPercent: Optional[float] = Field(None, ge=0, le=100)
+    pmiRate: Optional[float] = Field(None, ge=0, le=10)
+    sellingCostsPercent: Optional[float] = Field(None, ge=0, le=100)
+    # Optional tax information
+    federalTaxRate: Optional[float] = Field(None, ge=0, le=100)
+    stateTaxRate: Optional[float] = Field(None, ge=0, le=100)
+    taxFilingStatus: Optional[str] = Field(None)
 
 
 class MonthlySnapshot(BaseModel):

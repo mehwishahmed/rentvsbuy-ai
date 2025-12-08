@@ -34,6 +34,28 @@ app.add_middleware(
 )
 
 
+@app.get("/")
+def root() -> dict[str, str]:
+    """Root endpoint - provides API information."""
+    return {
+        "service": "Rent vs Buy AI Backend",
+        "version": "0.1.0",
+        "status": "running",
+        "endpoints": {
+            "health": "/health",
+            "finance_analyze": f"{settings.api_prefix}/finance/analyze",
+            "finance_heatmap": f"{settings.api_prefix}/finance/heatmap",
+            "finance_scenarios": f"{settings.api_prefix}/finance/scenarios",
+            "finance_sensitivity": f"{settings.api_prefix}/finance/sensitivity",
+            "finance_monte_carlo": f"{settings.api_prefix}/finance/monte-carlo",
+            "finance_chart_insight": f"{settings.api_prefix}/finance/chart-insight",
+            "finance_summary_insight": f"{settings.api_prefix}/finance/summary-insight",
+            "ai_chat": f"{settings.api_prefix}/ai/chat",
+        },
+        "docs": "/docs",
+    }
+
+
 @app.get("/health")
 def health_check() -> dict[str, str]:
     return {"status": "ok"}

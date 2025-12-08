@@ -10,9 +10,10 @@ html, body {
   margin: 0;
   padding: 0;
   width: 100%;
-  height: 100%;
+  min-height: 100%;
   background: #0a0d14; /* Dark background to match app */
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 * {
@@ -51,31 +52,36 @@ button:hover {
 /* Edit mode styles */
 .reference-box-actions {
   padding: 12px 16px;
-  border-top: 1px solid rgba(139, 92, 246, 0.2);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
   display: flex;
   justify-content: center;
-  border-radius: 0 0 16px 16px;
+  border-radius: 0 0 12px 12px;
   margin: 12px -16px -16px -16px;
   padding: 12px 16px;
-  background: rgba(30, 30, 40, 0.95);
+  background: rgba(15, 23, 42, 0.8);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
 }
 
 .edit-values-btn {
-  background: linear-gradient(135deg, rgba(139, 92, 246, 0.9) 0%, rgba(59, 130, 246, 0.9) 100%);
-  color: white;
-  border: none;
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   padding: 8px 16px;
-  border-radius: 20px;
+  border-radius: 8px;
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 500;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   backdrop-filter: blur(10px);
 }
 
 .edit-values-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.4);
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.2);
+  color: rgba(255, 255, 255, 1);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
 .edit-actions {
@@ -161,21 +167,219 @@ body {
 
 .app {
   min-height: 100vh;
-  height: 100vh;
   width: 100%;
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  position: relative;
   display: flex;
-  justify-content: center;
-  align-items: flex-start;
+  flex-direction: column;
+  justify-content: flex-start;
+  align-items: center;
   background: #0a0d14; /* Dark background to match chat container */
   padding: 0;
   margin: 0;
   overflow-x: hidden;
-  overflow-y: hidden;
+  overflow-y: auto;
+}
+
+.title-banner {
+  width: 100%;
+  padding: 16px 32px;
+  background: rgba(15, 23, 42, 0.95);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 32px;
+  z-index: 1000;
+  position: sticky;
+  top: 0;
+  box-sizing: border-box;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.24);
+}
+
+.title-banner-left {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 16px;
+  flex-shrink: 0;
+}
+
+.title-logo {
+  max-height: 48px;
+  width: auto;
+  display: block;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
+}
+
+.title-banner-tagline {
+  font-family: 'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  font-size: 13px;
+  font-weight: 400;
+  font-style: italic;
+  color: rgba(255, 255, 255, 0.6);
+  letter-spacing: 0.02em;
+  margin: 0;
+  padding: 0;
+  text-transform: none;
+  line-height: 1.4;
+}
+
+.title-banner-right {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-shrink: 0;
+  flex-wrap: nowrap;
+}
+
+.title-banner-text {
+  font-family: 'Space Grotesk', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  font-size: 32px;
+  font-weight: 700;
+  background: linear-gradient(135deg, #8b5cf6 0%, #3b82f6 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  letter-spacing: -0.02em;
+  margin: 0;
+  padding: 0;
+}
+
+.title-banner-subtitle {
+  font-family: 'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.7);
+  letter-spacing: 0.02em;
+  margin: 0;
+  padding: 0;
+  text-transform: uppercase;
+}
+
+.banner-button {
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  font-family: 'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  white-space: nowrap;
+}
+
+.banner-button:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.2);
+  color: rgba(255, 255, 255, 1);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.banner-button:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* About Modal Styles */
+.about-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(5, 8, 15, 0.7);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10004;
+  padding: 24px;
+}
+
+.about-modal-content {
+  width: min(800px, 90vw);
+  max-height: 90vh;
+  background: rgba(6, 10, 18, 0.98);
+  border: 1px solid rgba(139, 92, 246, 0.35);
+  border-radius: 24px;
+  box-shadow: 0 30px 80px rgba(2, 6, 23, 0.7);
+  padding: 32px 40px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  overflow-y: auto;
+}
+
+.about-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.about-modal-label {
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(148, 163, 184, 0.8);
+  margin-bottom: 8px;
+}
+
+.about-modal-title {
+  margin: 0;
+  font-size: 28px;
+  color: rgba(248, 250, 252, 0.95);
+  font-weight: 700;
+}
+
+.about-modal-close {
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 32px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.2s;
+}
+
+.about-modal-close:hover {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.about-modal-body {
+  color: rgba(255, 255, 255, 0.8);
+  line-height: 1.6;
+  font-size: 16px;
+}
+
+.about-modal-body p {
+  margin: 0 0 16px 0;
+}
+
+.about-modal-body p:last-child {
+  margin-bottom: 0;
 }
 
 .app-layout {
@@ -194,27 +398,31 @@ body {
   height: 100%;
   display: flex;
   flex-direction: column;
-  background: #1a1d29;
+  background: rgba(15, 23, 42, 0.95);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
   border-radius: 16px;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1), 0 2px 4px rgba(0, 0, 0, 0.06);
   overflow-x: hidden;
   overflow-y: hidden;
   flex: 1;
   min-width: 0;
   min-height: 0;
-  border: 1px solid rgba(139, 92, 246, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .chat-header {
-  background: linear-gradient(135deg, rgba(139, 92, 246, 0.3) 0%, rgba(59, 130, 246, 0.3) 100%);
+  background: rgba(15, 23, 42, 0.8);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
   color: white;
-  padding: 20px;
+  padding: 16px 24px;
   text-align: center;
   position: relative;
   display: flex;
   align-items: center;
   justify-content: flex-start;
-  border-bottom: 1px solid rgba(139, 92, 246, 0.2);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .chat-header h1 {
@@ -240,28 +448,28 @@ body {
 
 .tab-button {
   padding: 8px 16px;
-  background: rgba(30, 30, 40, 0.6);
+  background: rgba(255, 255, 255, 0.05);
   color: rgba(255, 255, 255, 0.7);
-  border: 1px solid rgba(139, 92, 246, 0.3);
-  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 500;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   backdrop-filter: blur(10px);
 }
 
 .tab-button:hover:not(:disabled) {
-  background: rgba(139, 92, 246, 0.3);
+  background: rgba(255, 255, 255, 0.1);
   color: rgba(255, 255, 255, 0.9);
-  border-color: rgba(139, 92, 246, 0.5);
+  border-color: rgba(255, 255, 255, 0.2);
 }
 
 .tab-button.active {
-  background: linear-gradient(135deg, rgba(139, 92, 246, 0.9) 0%, rgba(59, 130, 246, 0.9) 100%);
-  color: white;
-  border-color: rgba(139, 92, 246, 0.6);
-  box-shadow: 0 2px 8px rgba(139, 92, 246, 0.3);
+  background: rgba(255, 255, 255, 0.15);
+  color: rgba(255, 255, 255, 1);
+  border-color: rgba(255, 255, 255, 0.25);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .tab-button:disabled {
@@ -275,7 +483,7 @@ body {
   align-items: flex-start;
   gap: 32px;
   padding: 12px 4px;
-  background: rgba(10, 13, 20, 0.95);
+  background: rgba(15, 23, 42, 0.5);
   height: calc(100vh - 80px);
   overflow-y: auto;
 }
@@ -291,11 +499,13 @@ body {
 .charts-panel {
   width: 100%;
   max-width: 100%;
-  background: rgba(7, 10, 18, 0.92);
-  border: 1px solid rgba(139, 92, 246, 0.25);
-  border-radius: 28px;
+  background: rgba(15, 23, 42, 0.95);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
   padding: 12px 8px;
-  box-shadow: 0 20px 60px rgba(5, 8, 15, 0.65);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1), 0 2px 4px rgba(0, 0, 0, 0.06);
 }
 
 .assumption-controls-column {
@@ -330,21 +540,23 @@ body {
 
 .save-button {
   padding: 8px 16px;
-  background: linear-gradient(135deg, rgba(139, 92, 246, 0.9) 0%, rgba(59, 130, 246, 0.9) 100%);
-  color: white;
-  border: 2px solid rgba(139, 92, 246, 0.6);
-  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 500;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   backdrop-filter: blur(10px);
 }
 
 .save-button:hover {
-  background: linear-gradient(135deg, rgba(139, 92, 246, 1) 0%, rgba(59, 130, 246, 1) 100%);
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.4);
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.2);
+  color: rgba(255, 255, 255, 1);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
 .save-button:focus {
@@ -354,21 +566,23 @@ body {
 
 .restart-button {
   padding: 8px 16px;
-  background: linear-gradient(135deg, rgba(139, 92, 246, 0.9) 0%, rgba(59, 130, 246, 0.9) 100%);
-  color: white;
-  border: 2px solid rgba(139, 92, 246, 0.6);
-  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 500;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   backdrop-filter: blur(10px);
 }
 
 .restart-button:hover {
-  background: linear-gradient(135deg, rgba(139, 92, 246, 1) 0%, rgba(59, 130, 246, 1) 100%);
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.4);
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.2);
+  color: rgba(255, 255, 255, 1);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
 .restart-button:focus {
@@ -929,46 +1143,57 @@ body {
 .message-bubble {
   max-width: 70%;
   padding: 12px 16px;
-  border-radius: 18px;
-  line-height: 1.4;
+  border-radius: 12px;
+  line-height: 1.5;
 }
 
 .user-bubble {
-  background: linear-gradient(135deg, rgba(139, 92, 246, 0.8) 0%, rgba(59, 130, 246, 0.8) 100%);
-  color: white;
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.15);
   border-bottom-right-radius: 4px;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
 }
 
 .assistant-bubble {
-  background: rgba(30, 30, 40, 0.9);
+  background: rgba(255, 255, 255, 0.05);
   color: rgba(255, 255, 255, 0.9);
   border-bottom-left-radius: 4px;
-  border: 1px solid rgba(139, 92, 246, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
 }
 
 .chat-input-form {
   display: flex;
-  padding: 20px;
-  gap: 10px;
-  border-top: 1px solid rgba(139, 92, 246, 0.2);
-  background: #1a1d29;
+  padding: 16px 24px;
+  gap: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(15, 23, 42, 0.8);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
 }
 
 .chat-input {
   flex: 1;
   padding: 12px 16px;
-  border: 2px solid rgba(139, 92, 246, 0.3);
-  border-radius: 24px;
-  font-size: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  font-size: 14px;
   outline: none;
-  transition: border-color 0.2s;
-  background: rgba(30, 30, 40, 0.8);
-  color: white;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.9);
+  font-family: 'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
 }
 
 .chat-input:focus {
-  border-color: rgba(139, 92, 246, 0.8);
-  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.2);
+  border-color: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.08);
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.05);
 }
 
 .chat-input::placeholder {
@@ -977,23 +1202,30 @@ body {
 
 .send-button {
   padding: 12px 24px;
-  background: linear-gradient(135deg, rgba(139, 92, 246, 0.9) 0%, rgba(59, 130, 246, 0.9) 100%);
-  color: white;
-  border: none;
-  border-radius: 24px;
-  font-size: 16px;
-  font-weight: 600;
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
   cursor: pointer;
-  transition: transform 0.2s, box-shadow 0.2s;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  font-family: 'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
 }
 
 .send-button:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.4);
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.2);
+  color: rgba(255, 255, 255, 1);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
 .send-button:active {
   transform: translateY(0);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 /* Chart Styles */
@@ -2057,18 +2289,19 @@ body {
   position: fixed;
   top: 20px;
   right: 20px;
-  background: rgba(30, 30, 40, 0.95);
-  border-radius: 16px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  background: rgba(15, 23, 42, 0.95);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border-radius: 12px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1), 0 2px 4px rgba(0, 0, 0, 0.06);
   padding: 16px;
   max-width: 280px;
   max-height: calc(100vh - 40px);
   overflow-y: auto;
   overflow-x: hidden;
   z-index: 1001;
-  border: 1px solid rgba(139, 92, 246, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   animation: referenceBoxFadeIn 0.4s ease-out;
-  backdrop-filter: blur(10px);
 }
 
 /* Draggable reference box */
@@ -2146,11 +2379,13 @@ body {
 .reference-box-header {
   margin-bottom: 12px;
   padding-bottom: 8px;
-  border-bottom: 2px solid rgba(139, 92, 246, 0.5);
-  border-radius: 16px 16px 0 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px 12px 0 0;
   margin: -16px -16px 12px -16px;
   padding: 16px 16px 8px 16px;
-  background: rgba(30, 30, 40, 0.95);
+  background: rgba(15, 23, 42, 0.8);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
 }
 
 .reference-box-header h4 {
@@ -2451,12 +2686,15 @@ body {
   }
   
   .rvb-left {
-    flex: 0 0 380px;
-    max-width: 420px;
+    flex: 0 0 40%;
+  }
+  
+  .rvb-right {
+    flex: 1;
   }
   
   .chat-container {
-    max-width: 1600px;
+    max-width: 100%;
   }
 }
 
@@ -2467,12 +2705,15 @@ body {
   }
   
   .rvb-left {
-    flex: 0 0 420px;
-    max-width: 480px;
+    flex: 0 0 40%;
+  }
+  
+  .rvb-right {
+    flex: 1;
   }
   
   .chat-container {
-    max-width: 1800px;
+    max-width: 100%;
   }
 }
 
@@ -2522,9 +2763,8 @@ body {
 }
 
 .rvb-left {
-  flex: 0 0 320px;
-  min-width: 280px;
-  max-width: 400px;
+  flex: 0 0 40%;
+  min-width: 300px;
   overflow-y: visible;
   overflow-x: visible;
   display: flex;
@@ -2542,8 +2782,6 @@ body {
   flex-direction: column;
   overflow: hidden;
   min-width: 0;
-  max-width: none;
-  width: 100%;
   justify-content: flex-start;
   position: relative;
   align-items: stretch;
@@ -2622,8 +2860,11 @@ body {
   }
   
   .rvb-left {
-    flex: 0 0 380px;
-    max-width: 450px;
+    flex: 0 0 40%;
+  }
+  
+  .rvb-right {
+    flex: 1;
   }
 }
 
@@ -2633,8 +2874,11 @@ body {
   }
   
   .rvb-left {
-    flex: 0 0 340px;
-    max-width: 380px;
+    flex: 0 0 40%;
+  }
+  
+  .rvb-right {
+    flex: 1;
   }
 }
 
@@ -2668,12 +2912,13 @@ body {
   }
   
   .rvb-left {
-    flex: 0 0 380px;
-    max-width: 420px;
+    flex: 0 0 40%;
+    max-width: 40%;
   }
   
   .rvb-right {
-    flex: 1 1 auto;
+    flex: 0 0 60%;
+    max-width: 60%;
     min-width: 0;
   }
   
@@ -2694,12 +2939,11 @@ body {
   }
   
   .rvb-left {
-    flex: 0 0 420px;
-    max-width: 480px;
+    flex: 0 0 40%;
   }
   
   .rvb-right {
-    flex: 1 1 auto;
+    flex: 1;
   }
   
   .chat-container {

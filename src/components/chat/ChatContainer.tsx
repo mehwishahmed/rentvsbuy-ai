@@ -1,6 +1,7 @@
 // src/components/chat/ChatContainer.tsx
 
 import { useState, useRef, useEffect, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { ChatMessage } from './ChatMessage';
 import { ChatInput } from './ChatInput';
 import { NetWorthChart } from '../charts/NetWorthChart';
@@ -18,8 +19,6 @@ import { MonteCarloChart } from '../charts/MonteCarloChart';
 import { SensitivityChart } from '../charts/SensitivityChart';
 import { ChartPlaceholder } from '../charts/ChartPlaceholder';
 import { ChartsGrid } from '../charts/ChartsGrid';
-import { BasicInputsCard } from './BasicInputsCard';
-import { AdvancedInputsCard } from './AdvancedInputsCard';
 import { generateRecommendation, type Recommendation } from '../../types/recommendation';
 import { RecommendationCard } from '../RecommendationCard/RecommendationCard';
 import { calculateNetWorthComparison, calculateBuyingCosts, calculateRentingCosts, getTimelineBasedRates, getZIPBasedRates } from '../../lib/finance/calculator';
@@ -253,6 +252,12 @@ type AdvancedInputs = {
   homeInsuranceAnnual: number;
   renterInsuranceAnnual: number;
   hoaMonthly: number;
+  investmentReturnRate?: number;
+  closingCostsPercent?: number;
+  pmiRate?: number;
+  federalTaxRate?: number;
+  stateTaxRate?: number;
+  taxFilingStatus?: 'single' | 'married_joint' | 'married_separate' | 'head_of_household';
 };
 
 // Helper function to generate unique message IDs
@@ -314,6 +319,11 @@ const [chartsReady, setChartsReady] = useState(false);
   // Edit mode state
   const [isEditMode, setIsEditMode] = useState(false);
   const [editableValues, setEditableValues] = useState<UserData | null>(null);
+  const [isLocationEditMode, setIsLocationEditMode] = useState(false);
+  const [editableLocationData, setEditableLocationData] = useState<FormattedLocationData | null>(null);
+  const [showHomePurchaseDetails, setShowHomePurchaseDetails] = useState(false);
+  const [showRentDetails, setShowRentDetails] = useState(false);
+  const [showInvestmentTaxDetails, setShowInvestmentTaxDetails] = useState(false);
   const [advancedInputs, setAdvancedInputs] = useState<AdvancedInputs>({
     loanTermYears: 30,
     interestRate: 7,
@@ -322,8 +332,21 @@ const [chartsReady, setChartsReady] = useState(false);
     homeInsuranceAnnual: 1200,
     renterInsuranceAnnual: 240,
     hoaMonthly: 150,
+    investmentReturnRate: 7,
+    closingCostsPercent: 3,
+    pmiRate: 0.5,
+    federalTaxRate: 22,
+    stateTaxRate: 5,
+    taxFilingStatus: 'single',
   });
   const [editableAdvancedValues, setEditableAdvancedValues] = useState<AdvancedInputs | null>(null);
+  
+  // Track last analysis inputs to detect changes
+  const [lastAnalysisInputs, setLastAnalysisInputs] = useState<{
+    userData: UserData;
+    advancedInputs: AdvancedInputs;
+    locationData: FormattedLocationData | null;
+  } | null>(null);
   
   // Advanced assumptions visibility state
   const [showAdvancedAssumptions, setShowAdvancedAssumptions] = useState(false);
@@ -339,6 +362,46 @@ const [chartsReady, setChartsReady] = useState(false);
   const scenarioOverlayErrorRef = useRef(false);
   const heatmapErrorRef = useRef(false);
   const lastPropertyTaxRateRef = useRef<number | null>(null);
+  
+  // Initialize editable values when modals open
+  useEffect(() => {
+    const isAnyModalOpen = showHomePurchaseDetails || showRentDetails || showInvestmentTaxDetails;
+    if (isAnyModalOpen && editableAdvancedValues === null) {
+      setEditableAdvancedValues({ ...advancedInputs });
+    }
+  }, [showHomePurchaseDetails, showRentDetails, showInvestmentTaxDetails]);
+
+  // Save advanced values when modals close
+  useEffect(() => {
+    const isAnyModalOpen = showHomePurchaseDetails || showRentDetails || showInvestmentTaxDetails;
+    if (!isAnyModalOpen && editableAdvancedValues !== null) {
+      setAdvancedInputs(editableAdvancedValues);
+      setEditableAdvancedValues(null);
+    }
+  }, [showHomePurchaseDetails, showRentDetails, showInvestmentTaxDetails]);
+
+  // Handle ESC key to close any advanced details modal
+  useEffect(() => {
+    const handleEscKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (showHomePurchaseDetails) setShowHomePurchaseDetails(false);
+        if (showRentDetails) setShowRentDetails(false);
+        if (showInvestmentTaxDetails) setShowInvestmentTaxDetails(false);
+      }
+    };
+    
+    const isAnyModalOpen = showHomePurchaseDetails || showRentDetails || showInvestmentTaxDetails;
+    if (isAnyModalOpen) {
+      document.addEventListener('keydown', handleEscKey);
+      // Prevent body scroll when modal is open
+      document.body.style.overflow = 'hidden';
+    }
+    
+    return () => {
+      document.removeEventListener('keydown', handleEscKey);
+      document.body.style.overflow = '';
+    };
+  }, [showHomePurchaseDetails, showRentDetails, showInvestmentTaxDetails]);
   
   // Memoize advancedInputs key values to prevent unnecessary re-renders
   const advancedInputsKey = useMemo(() => {
@@ -1024,10 +1087,149 @@ const [chartsReady, setChartsReady] = useState(false);
     });
   };
 
-  const handleAdvancedFieldChange = (field: keyof AdvancedInputs, value: number) => {
+  const handleAdvancedFieldChange = (field: keyof AdvancedInputs, value: number | string) => {
+    const updatedValue = value as any;
     setEditableAdvancedValues(prev => {
-      const next = prev ? { ...prev } : { ...advancedInputs };
-      next[field] = value;
+      const base = prev ?? advancedInputs;
+      return {
+        ...base,
+        [field]: updatedValue
+      };
+    });
+    // Update advancedInputs immediately so calculations use new values
+    setAdvancedInputs(prev => ({
+      ...prev,
+      [field]: updatedValue
+    }));
+  };
+
+  // Helper to get current value (editable or original)
+  const getAdvancedValue = (field: keyof AdvancedInputs): number | string => {
+    const editable = editableAdvancedValues ?? advancedInputs;
+    return editable[field] ?? (advancedInputs[field] as any) ?? 0;
+  };
+
+  // Check if inputs have changed since last analysis
+  const hasInputsChanged = (): boolean => {
+    if (!lastAnalysisInputs || !unifiedAnalysisResult) return false;
+    
+    // Compare user data
+    const userDataChanged = 
+      userData.homePrice !== lastAnalysisInputs.userData.homePrice ||
+      userData.monthlyRent !== lastAnalysisInputs.userData.monthlyRent ||
+      userData.downPaymentPercent !== lastAnalysisInputs.userData.downPaymentPercent ||
+      userData.timeHorizonYears !== lastAnalysisInputs.userData.timeHorizonYears;
+    
+    // Compare advanced inputs
+    const advancedChanged = 
+      JSON.stringify(advancedInputs) !== JSON.stringify(lastAnalysisInputs.advancedInputs);
+    
+    // Compare location data (especially medianHomePrice and averageRent which affect calculations)
+    const locationChanged = 
+      locationData?.medianHomePrice !== lastAnalysisInputs.locationData?.medianHomePrice ||
+      locationData?.averageRent !== lastAnalysisInputs.locationData?.averageRent ||
+      locationData?.propertyTaxRate !== lastAnalysisInputs.locationData?.propertyTaxRate ||
+      locationData?.homeAppreciationRate !== lastAnalysisInputs.locationData?.homeAppreciationRate ||
+      locationData?.rentGrowthRate !== lastAnalysisInputs.locationData?.rentGrowthRate;
+    
+    return userDataChanged || advancedChanged || locationChanged;
+  };
+
+  // Handle recalculate button click
+  const handleRecalculate = async () => {
+    if (!userData.homePrice || !userData.monthlyRent || !userData.downPaymentPercent || !userData.timeHorizonYears) {
+      return; // Can't recalculate without required inputs
+    }
+
+    setIsAnalyzing(true);
+    setLoadingProgress({ stage: 'Analyzing...', progress: 0 });
+
+    try {
+      const inputs = buildScenarioInputs(userData, locationData, unifiedAnalysisResult ?? null, advancedInputs);
+      const { analysis, unifiedAnalysis } = await runAnalysis(inputs, currentZipCode);
+      
+      setLoadingProgress({ stage: 'Complete!', progress: 100 });
+      setIsAnalyzing(false);
+      
+      setUnifiedAnalysisResult(unifiedAnalysis ?? null);
+      
+      // Update last analysis inputs snapshot
+      setLastAnalysisInputs({
+        userData: { ...userData },
+        advancedInputs: { ...advancedInputs },
+        locationData: locationData ? { ...locationData } : null,
+      });
+
+      applyAnalysis(analysis);
+
+      // Generate and show new recommendation
+      if (unifiedAnalysis && userData.timeHorizonYears) {
+        const recommendation = generateRecommendation(unifiedAnalysis, userData.timeHorizonYears);
+        
+        const recommendationMessage: Message = {
+          id: generateMessageId('recommendation-'),
+          role: 'assistant',
+          content: '',
+          showRecommendation: true,
+          recommendation: recommendation,
+          recommendationTimeline: userData.timeHorizonYears,
+          recommendationLocation: locationData ? `${locationData.city}, ${locationData.state}` : undefined
+        };
+        setMessages(prev => [...prev, recommendationMessage]);
+      }
+    } catch (error) {
+      console.error('Recalculation error:', error);
+      setIsAnalyzing(false);
+      setLoadingProgress({ stage: '', progress: 0 });
+    }
+  };
+
+  // Location data edit handlers
+  const handleEditLocation = () => {
+    setIsLocationEditMode(true);
+    if (locationData) {
+      setEditableLocationData({ ...locationData });
+    }
+  };
+
+  const handleCancelLocationEdit = () => {
+    setIsLocationEditMode(false);
+    setEditableLocationData(null);
+  };
+
+  const handleSaveLocationEdit = () => {
+    if (editableLocationData) {
+      setLocationData(editableLocationData);
+      
+      // If user is using location data (ZIP-based), update userData.homePrice when medianHomePrice changes
+      // This ensures the calculation uses the updated home price
+      if (usingZipData && editableLocationData.medianHomePrice !== locationData?.medianHomePrice) {
+        setUserData(prev => ({
+          ...prev,
+          homePrice: editableLocationData.medianHomePrice
+        }));
+      }
+      
+      // Also update monthlyRent if averageRent changed and user is using location data
+      if (usingZipData && editableLocationData.averageRent !== null && 
+          editableLocationData.averageRent !== locationData?.averageRent) {
+        setUserData(prev => ({
+          ...prev,
+          monthlyRent: editableLocationData.averageRent
+        }));
+      }
+      
+      setIsLocationEditMode(false);
+      setEditableLocationData(null);
+      // Trigger recalculation if needed
+    }
+  };
+
+  const handleLocationFieldChange = (field: keyof FormattedLocationData, value: number | string | null) => {
+    setEditableLocationData(prev => {
+      if (!prev) return null;
+      const next = { ...prev };
+      (next as any)[field] = value;
       return next;
     });
   };
@@ -1409,6 +1611,13 @@ function shouldShowChart(aiResponse: string): ChartType | null {
         });
         
         setUnifiedAnalysisResult(unifiedAnalysis ?? null);
+        
+        // Store snapshot of inputs used for this analysis
+        setLastAnalysisInputs({
+          userData: { ...newUserData },
+          advancedInputs: { ...advancedInputs },
+          locationData: locationData ? { ...locationData } : null,
+        });
         
         analysisSource = source;
         analysisApplied = true;
@@ -2365,9 +2574,18 @@ const handleChipClick = (message: string) => {
       hoaMonthly: overrides?.hoaMonthly ?? 150,
       maintenanceRate: overrides?.maintenanceRate ?? 1.0,
       renterInsuranceAnnual: overrides?.renterInsuranceAnnual ?? 240,
+      // Additional costs - use user overrides if provided
+      closingCostsPercent: overrides?.closingCostsPercent ?? 3.0,
+      pmiRate: overrides?.pmiRate ?? 0.5,
+      sellingCostsPercent: 6.0, // Default 6% for real estate commission
+      // Tax information
+      federalTaxRate: overrides?.federalTaxRate ?? 22,
+      stateTaxRate: overrides?.stateTaxRate ?? 5,
+      taxFilingStatus: overrides?.taxFilingStatus ?? 'single',
+      // Growth assumptions - prioritize user override for investmentReturnRate
       homeAppreciationRate: rateSource.homeAppreciationRate,
       rentGrowthRate: rateSource.rentGrowthRate,
-      investmentReturnRate: rateSource.investmentReturnRate
+      investmentReturnRate: overrides?.investmentReturnRate ?? rateSource.investmentReturnRate
     };
   };
 
@@ -3174,29 +3392,37 @@ const handleChipClick = (message: string) => {
     locationData?.rentGrowthRate ??
     null;
 
+  const displayLocationData = isLocationEditMode && editableLocationData ? editableLocationData : locationData;
+  const displayHomeGrowth = isLocationEditMode && editableLocationData?.homeAppreciationRate !== null 
+    ? editableLocationData.homeAppreciationRate 
+    : resolvedHomeGrowth;
+  const displayRentGrowth = isLocationEditMode && editableLocationData?.rentGrowthRate !== null 
+    ? editableLocationData.rentGrowthRate 
+    : resolvedRentGrowth;
+
   const locationMetrics = [
     {
       label: 'Median home',
-      value: locationData ? `$${locationData.medianHomePrice.toLocaleString()}` : 'Awaiting data',
+      value: displayLocationData ? `$${displayLocationData.medianHomePrice.toLocaleString()}` : 'Awaiting data',
     },
     {
       label: 'Median rent',
-      value: locationData?.averageRent ? `$${locationData.averageRent.toLocaleString()}/mo` : 'Awaiting data',
+      value: displayLocationData?.averageRent ? `$${displayLocationData.averageRent.toLocaleString()}/mo` : 'Awaiting data',
     },
     {
       label: 'Property tax',
       value:
-        typeof locationData?.propertyTaxRate === 'number'
-          ? `${locationData.propertyTaxRate.toFixed(2)}%`
+        typeof displayLocationData?.propertyTaxRate === 'number'
+          ? `${(displayLocationData.propertyTaxRate * 100).toFixed(2)}%`
           : 'Awaiting data',
     },
     {
       label: 'Home appreciation',
-      value: resolvedHomeGrowth !== null ? `${resolvedHomeGrowth.toFixed(2)}%/yr` : 'Pending',
+      value: displayHomeGrowth !== null ? `${displayHomeGrowth.toFixed(2)}%/yr` : 'Pending',
     },
     {
       label: 'Rent growth',
-      value: resolvedRentGrowth !== null ? `${resolvedRentGrowth.toFixed(2)}%/yr` : 'Pending',
+      value: displayRentGrowth !== null ? `${displayRentGrowth.toFixed(2)}%/yr` : 'Pending',
     },
   ];
 
@@ -3272,14 +3498,14 @@ const handleChipClick = (message: string) => {
         {activeTab === 'chat' && (
           <div className="rvb-left">
             <section style={locationCardStyle} data-tour-id="phase-one-card">
-              <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px', marginBottom: '16px' }}>
                 <div style={{ flex: '1 1 320px' }}>
                   <span style={phaseLabelStyle}>Phase 1 · Local market data</span>
                   <h3 style={{ margin: '4px 0 0 0', fontSize: '18px', color: 'rgba(255,255,255,0.92)' }}>
                     Local market snapshot
                   </h3>
                   <p style={locationDescriptionStyle}>
-                    I anchor every analysis to real market data. Mention any ZIP code or city in the chat and I’ll refresh these
+                    I anchor every analysis to real market data. Mention any ZIP code or city in the chat and I'll refresh these
                     numbers automatically.
                   </p>
                 </div>
@@ -3298,51 +3524,1670 @@ const handleChipClick = (message: string) => {
               {locationData ? (
                 <>
                   <div style={metricGridStyle}>
-                    {locationMetrics.map((metric) => (
-                      <div key={metric.label} style={metricItemStyle}>
-                        <span style={metricLabelStyle}>{metric.label}: </span>
-                        <span style={metricValueStyle}>{metric.value}</span>
-                      </div>
-                    ))}
+                    {isLocationEditMode && editableLocationData ? (
+                      <>
+                        <div style={metricItemStyle}>
+                          <span style={metricLabelStyle}>Median home: </span>
+                          <input
+                            type="number"
+                            value={editableLocationData.medianHomePrice}
+                            onChange={(e) => handleLocationFieldChange('medianHomePrice', Number(e.target.value))}
+                            style={{
+                              ...metricValueStyle,
+                              background: 'rgba(255,255,255,0.05)',
+                              border: '1px solid rgba(255,255,255,0.12)',
+                              borderRadius: '8px',
+                              padding: '8px 10px',
+                              width: '100%',
+                              marginTop: '4px',
+                            }}
+                          />
+                        </div>
+                        <div style={metricItemStyle}>
+                          <span style={metricLabelStyle}>Median rent: </span>
+                          <input
+                            type="number"
+                            value={editableLocationData.averageRent || ''}
+                            onChange={(e) => handleLocationFieldChange('averageRent', Number(e.target.value))}
+                            style={{
+                              ...metricValueStyle,
+                              background: 'rgba(255,255,255,0.05)',
+                              border: '1px solid rgba(255,255,255,0.12)',
+                              borderRadius: '8px',
+                              padding: '8px 10px',
+                              width: '100%',
+                              marginTop: '4px',
+                            }}
+                          />
+                        </div>
+                        <div style={metricItemStyle}>
+                          <span style={metricLabelStyle}>Property tax (%): </span>
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={editableLocationData.propertyTaxRate * 100}
+                            onChange={(e) => {
+                              const percentValue = Number(e.target.value);
+                              if (!isNaN(percentValue)) {
+                                handleLocationFieldChange('propertyTaxRate', percentValue / 100);
+                              }
+                            }}
+                            style={{
+                              ...metricValueStyle,
+                              background: 'rgba(255,255,255,0.05)',
+                              border: '1px solid rgba(255,255,255,0.12)',
+                              borderRadius: '8px',
+                              padding: '8px 10px',
+                              width: '100%',
+                              marginTop: '4px',
+                              color: 'rgba(255,255,255,0.95)',
+                            }}
+                          />
+                        </div>
+                        <div style={metricItemStyle}>
+                          <span style={metricLabelStyle}>Home appreciation (%/yr): </span>
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={editableLocationData.homeAppreciationRate ?? ''}
+                            onChange={(e) => {
+                              const value = e.target.value === '' ? null : Number(e.target.value);
+                              if (value === null || !isNaN(value)) {
+                                handleLocationFieldChange('homeAppreciationRate', value);
+                              }
+                            }}
+                            style={{
+                              ...metricValueStyle,
+                              background: 'rgba(255,255,255,0.05)',
+                              border: '1px solid rgba(255,255,255,0.12)',
+                              borderRadius: '8px',
+                              padding: '8px 10px',
+                              width: '100%',
+                              marginTop: '4px',
+                              color: 'rgba(255,255,255,0.95)',
+                            }}
+                          />
+                        </div>
+                        <div style={metricItemStyle}>
+                          <span style={metricLabelStyle}>Rent growth (%/yr): </span>
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={editableLocationData.rentGrowthRate ?? ''}
+                            onChange={(e) => {
+                              const value = e.target.value === '' ? null : Number(e.target.value);
+                              if (value === null || !isNaN(value)) {
+                                handleLocationFieldChange('rentGrowthRate', value);
+                              }
+                            }}
+                            style={{
+                              ...metricValueStyle,
+                              background: 'rgba(255,255,255,0.05)',
+                              border: '1px solid rgba(255,255,255,0.12)',
+                              borderRadius: '8px',
+                              padding: '8px 10px',
+                              width: '100%',
+                              marginTop: '4px',
+                              color: 'rgba(255,255,255,0.95)',
+                            }}
+                          />
+                        </div>
+                      </>
+                    ) : (
+                      locationMetrics.map((metric) => (
+                        <div key={metric.label} style={metricItemStyle}>
+                          <span style={metricLabelStyle}>{metric.label}: </span>
+                          <span style={metricValueStyle}>{metric.value}</span>
+                        </div>
+                      ))
+                    )}
                   </div>
-                  <p style={locationFooterStyle}>
-                    Want to compare a different neighborhood? Just mention another ZIP or city in the chat.
-                  </p>
+                  <div style={{ display: 'flex', gap: '12px', marginTop: '16px' }}>
+                    {isLocationEditMode ? (
+                      <>
+                        <button
+                          onClick={handleSaveLocationEdit}
+                          style={{
+                            flex: 1,
+                            padding: '10px 12px',
+                            borderRadius: '8px',
+                            border: 'none',
+                            background: 'rgba(255, 255, 255, 0.1)',
+                            color: 'rgba(255, 255, 255, 0.9)',
+                            cursor: 'pointer',
+                            fontWeight: 500,
+                            fontSize: '14px',
+                          }}
+                        >
+                          Save
+                        </button>
+                        <button
+                          onClick={handleCancelLocationEdit}
+                          style={{
+                            flex: 1,
+                            padding: '10px 12px',
+                            borderRadius: '8px',
+                            border: '1px solid rgba(255, 255, 255, 0.1)',
+                            background: 'rgba(255, 255, 255, 0.05)',
+                            color: 'rgba(255, 255, 255, 0.7)',
+                            cursor: 'pointer',
+                            fontWeight: 500,
+                            fontSize: '14px',
+                          }}
+                        >
+                          Cancel
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <button
+                          onClick={handleEditLocation}
+                          style={{
+                            flex: 1,
+                            padding: '10px 12px',
+                            borderRadius: '8px',
+                            border: '1px solid rgba(255, 255, 255, 0.1)',
+                            background: 'rgba(255, 255, 255, 0.1)',
+                            color: 'rgba(255, 255, 255, 0.9)',
+                            cursor: 'pointer',
+                            fontWeight: 500,
+                            fontSize: '14px',
+                          }}
+                        >
+                          Edit Market Data
+                        </button>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', flex: 1 }}>
+                          <button
+                            onClick={() => setShowHomePurchaseDetails(!showHomePurchaseDetails)}
+                            style={{
+                              width: '100%',
+                              padding: '10px 12px',
+                              borderRadius: '8px',
+                              border: '1px solid rgba(255, 255, 255, 0.1)',
+                              background: showHomePurchaseDetails ? 'rgba(255, 255, 255, 0.15)' : 'rgba(255, 255, 255, 0.05)',
+                              color: 'rgba(255, 255, 255, 0.9)',
+                              cursor: 'pointer',
+                              fontWeight: 500,
+                              fontSize: '13px',
+                            }}
+                          >
+                            🏠 Home Purchase/Rent
+                          </button>
+                          <button
+                            onClick={() => setShowRentDetails(!showRentDetails)}
+                            style={{
+                              width: '100%',
+                              padding: '10px 12px',
+                              borderRadius: '8px',
+                              border: '1px solid rgba(255, 255, 255, 0.1)',
+                              background: showRentDetails ? 'rgba(255, 255, 255, 0.15)' : 'rgba(255, 255, 255, 0.05)',
+                              color: 'rgba(255, 255, 255, 0.9)',
+                              cursor: 'pointer',
+                              fontWeight: 500,
+                              fontSize: '13px',
+                            }}
+                          >
+                            💳 Loan Details
+                          </button>
+                          <button
+                            onClick={() => setShowInvestmentTaxDetails(!showInvestmentTaxDetails)}
+                            style={{
+                              width: '100%',
+                              padding: '10px 12px',
+                              borderRadius: '8px',
+                              border: '1px solid rgba(255, 255, 255, 0.1)',
+                              background: showInvestmentTaxDetails ? 'rgba(255, 255, 255, 0.15)' : 'rgba(255, 255, 255, 0.05)',
+                              color: 'rgba(255, 255, 255, 0.9)',
+                              cursor: 'pointer',
+                              fontWeight: 500,
+                              fontSize: '13px',
+                            }}
+                          >
+                            💰 Investment & Tax
+                          </button>
+                        </div>
+                        {/* Recalculate Button - Show when inputs have changed */}
+                        {hasInputsChanged() && (
+                          <button
+                            onClick={handleRecalculate}
+                            disabled={isAnalyzing}
+                            style={{
+                              width: '100%',
+                              padding: '12px 16px',
+                              borderRadius: '8px',
+                              border: 'none',
+                              background: isAnalyzing 
+                                ? 'rgba(139, 92, 246, 0.3)' 
+                                : 'linear-gradient(135deg, rgba(139, 92, 246, 0.8) 0%, rgba(99, 102, 241, 0.8) 100%)',
+                              color: 'rgba(255, 255, 255, 0.95)',
+                              cursor: isAnalyzing ? 'not-allowed' : 'pointer',
+                              fontWeight: 600,
+                              fontSize: '14px',
+                              marginTop: '12px',
+                              boxShadow: isAnalyzing 
+                                ? 'none' 
+                                : '0 4px 12px rgba(139, 92, 246, 0.3)',
+                              transition: 'all 0.2s ease',
+                              opacity: isAnalyzing ? 0.6 : 1,
+                            }}
+                            onMouseEnter={(e) => {
+                              if (!isAnalyzing) {
+                                e.currentTarget.style.transform = 'translateY(-1px)';
+                                e.currentTarget.style.boxShadow = '0 6px 16px rgba(139, 92, 246, 0.4)';
+                              }
+                            }}
+                            onMouseLeave={(e) => {
+                              if (!isAnalyzing) {
+                                e.currentTarget.style.transform = 'translateY(0)';
+                                e.currentTarget.style.boxShadow = '0 4px 12px rgba(139, 92, 246, 0.3)';
+                              }
+                            }}
+                          >
+                            {isAnalyzing ? '🔄 Recalculating...' : '🔄 Recalculate Analysis'}
+                          </button>
+                        )}
+                      </>
+                    )}
+                  </div>
+                  {/* Modal 1: Home Purchase Details */}
+                  {showHomePurchaseDetails && !isLocationEditMode && createPortal(
+                    <>
+                      {/* Modal Backdrop */}
+                      <div
+                        onClick={() => setShowHomePurchaseDetails(false)}
+                        style={{
+                          position: 'fixed',
+                          top: 0,
+                          left: 0,
+                          right: 0,
+                          bottom: 0,
+                          background: 'rgba(0, 0, 0, 0.75)',
+                          backdropFilter: 'blur(8px)',
+                          WebkitBackdropFilter: 'blur(8px)',
+                          zIndex: 10005,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          padding: '20px',
+                        }}
+                      >
+                        {/* Modal Content */}
+                        <div
+                          onClick={(e) => e.stopPropagation()}
+                          style={{
+                            background: 'linear-gradient(135deg, rgba(12, 16, 27, 0.98) 0%, rgba(15, 23, 42, 0.98) 100%)',
+                            border: '1px solid rgba(139, 92, 246, 0.3)',
+                            borderRadius: '20px',
+                            padding: '32px',
+                            maxWidth: '700px',
+                            width: '100%',
+                            maxHeight: '90vh',
+                            overflowY: 'auto',
+                            boxShadow: '0 20px 60px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(139, 92, 246, 0.1)',
+                            zIndex: 10006,
+                            position: 'relative',
+                          }}
+                        >
+                          {/* Close Button */}
+                          <button
+                            onClick={() => setShowHomePurchaseDetails(false)}
+                            style={{
+                              position: 'absolute',
+                              top: '20px',
+                              right: '20px',
+                              background: 'rgba(255, 255, 255, 0.1)',
+                              border: '1px solid rgba(255, 255, 255, 0.15)',
+                              borderRadius: '50%',
+                              width: '32px',
+                              height: '32px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              cursor: 'pointer',
+                              color: 'rgba(255, 255, 255, 0.8)',
+                              fontSize: '18px',
+                              transition: 'all 0.2s ease',
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)';
+                              e.currentTarget.style.borderColor = 'rgba(139, 92, 246, 0.5)';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
+                              e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.15)';
+                            }}
+                          >
+                            ×
+                          </button>
+
+                          {/* Header */}
+                          <div style={{ marginBottom: '24px', paddingRight: '40px' }}>
+                            <h3 style={{
+                              margin: '0 0 8px 0',
+                              fontSize: '24px',
+                              fontWeight: 600,
+                              color: 'rgba(255, 255, 255, 0.95)',
+                              background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(139, 92, 246, 0.9) 100%)',
+                              WebkitBackgroundClip: 'text',
+                              WebkitTextFillColor: 'transparent',
+                              backgroundClip: 'text',
+                            }}>
+                              Home Purchase/Rent Details
+                            </h3>
+                            <p style={{
+                              margin: 0,
+                              fontSize: '14px',
+                              color: 'rgba(255, 255, 255, 0.65)',
+                              lineHeight: '1.5',
+                            }}>
+                              Configure home purchase, ownership costs, and renting details including taxes, insurance, and maintenance.
+                            </p>
+                          </div>
+
+                          {/* Fields Grid */}
+                          <div style={{
+                            display: 'grid',
+                            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                            gap: '16px',
+                          }}>
+                            {/* Time Horizon Years */}
+                            <div style={{
+                              border: '1px solid rgba(255, 255, 255, 0.1)',
+                              borderRadius: '12px',
+                              padding: '16px',
+                              background: 'rgba(255, 255, 255, 0.03)',
+                              transition: 'all 0.2s ease',
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.borderColor = 'rgba(139, 92, 246, 0.4)';
+                              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)';
+                              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.03)';
+                            }}
+                            >
+                              <div style={{
+                                fontSize: '12px',
+                                color: 'rgba(255, 255, 255, 0.65)',
+                                marginBottom: '8px',
+                                fontWeight: 500,
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.5px',
+                              }}>
+                                Time Horizon
+                              </div>
+                              <input
+                                type="number"
+                                step="1"
+                                min="1"
+                                value={userData.timeHorizonYears ?? ''}
+                                onChange={(e) => {
+                                  const value = e.target.value === '' ? null : Number(e.target.value);
+                                  setUserData(prev => ({ ...prev, timeHorizonYears: value }));
+                                }}
+                                placeholder="5"
+                                style={{
+                                  width: '100%',
+                                  borderRadius: '8px',
+                                  border: '1px solid rgba(255, 255, 255, 0.15)',
+                                  background: 'rgba(255, 255, 255, 0.08)',
+                                  color: 'rgba(255, 255, 255, 0.95)',
+                                  padding: '10px 12px',
+                                  fontSize: '15px',
+                                  fontWeight: 600,
+                                  outline: 'none',
+                                  transition: 'all 0.2s ease',
+                                }}
+                                onFocus={(e) => {
+                                  e.target.style.borderColor = 'rgba(139, 92, 246, 0.6)';
+                                  e.target.style.background = 'rgba(255, 255, 255, 0.12)';
+                                }}
+                                onBlur={(e) => {
+                                  e.target.style.borderColor = 'rgba(255, 255, 255, 0.15)';
+                                  e.target.style.background = 'rgba(255, 255, 255, 0.08)';
+                                }}
+                              />
+                              <div style={{
+                                fontSize: '11px',
+                                color: 'rgba(255, 255, 255, 0.5)',
+                                marginTop: '4px',
+                              }}>
+                                years
+                              </div>
+                            </div>
+
+                            {/* Loan Term */}
+                            <div style={{
+                              border: '1px solid rgba(255, 255, 255, 0.1)',
+                              borderRadius: '12px',
+                              padding: '16px',
+                              background: 'rgba(255, 255, 255, 0.03)',
+                              transition: 'all 0.2s ease',
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.borderColor = 'rgba(139, 92, 246, 0.4)';
+                              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)';
+                              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.03)';
+                            }}
+                            >
+                              <div style={{
+                                fontSize: '12px',
+                                color: 'rgba(255, 255, 255, 0.65)',
+                                marginBottom: '8px',
+                                fontWeight: 500,
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.5px',
+                              }}>
+                                Loan Term
+                              </div>
+                              <input
+                                type="number"
+                                step="1"
+                                value={getAdvancedValue('loanTermYears') as number}
+                                onChange={(e) => handleAdvancedFieldChange('loanTermYears', Number(e.target.value))}
+                                style={{
+                                  width: '100%',
+                                  borderRadius: '8px',
+                                  border: '1px solid rgba(255, 255, 255, 0.15)',
+                                  background: 'rgba(255, 255, 255, 0.08)',
+                                  color: 'rgba(255, 255, 255, 0.95)',
+                                  padding: '10px 12px',
+                                  fontSize: '15px',
+                                  fontWeight: 600,
+                                  outline: 'none',
+                                  transition: 'all 0.2s ease',
+                                }}
+                                onFocus={(e) => {
+                                  e.target.style.borderColor = 'rgba(139, 92, 246, 0.6)';
+                                  e.target.style.background = 'rgba(255, 255, 255, 0.12)';
+                                }}
+                                onBlur={(e) => {
+                                  e.target.style.borderColor = 'rgba(255, 255, 255, 0.15)';
+                                  e.target.style.background = 'rgba(255, 255, 255, 0.08)';
+                                }}
+                              />
+                              <div style={{
+                                fontSize: '11px',
+                                color: 'rgba(255, 255, 255, 0.5)',
+                                marginTop: '4px',
+                              }}>
+                                years
+                              </div>
+                            </div>
+
+                            {/* Mortgage Rate */}
+                            <div style={{
+                              border: '1px solid rgba(255, 255, 255, 0.1)',
+                              borderRadius: '12px',
+                              padding: '16px',
+                              background: 'rgba(255, 255, 255, 0.03)',
+                              transition: 'all 0.2s ease',
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.borderColor = 'rgba(139, 92, 246, 0.4)';
+                              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)';
+                              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.03)';
+                            }}
+                            >
+                              <div style={{
+                                fontSize: '12px',
+                                color: 'rgba(255, 255, 255, 0.65)',
+                                marginBottom: '8px',
+                                fontWeight: 500,
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.5px',
+                              }}>
+                                Mortgage Rate
+                              </div>
+                              <input
+                                type="number"
+                                step="0.1"
+                                value={getAdvancedValue('interestRate') as number}
+                                onChange={(e) => handleAdvancedFieldChange('interestRate', Number(e.target.value))}
+                                style={{
+                                  width: '100%',
+                                  borderRadius: '8px',
+                                  border: '1px solid rgba(255, 255, 255, 0.15)',
+                                  background: 'rgba(255, 255, 255, 0.08)',
+                                  color: 'rgba(255, 255, 255, 0.95)',
+                                  padding: '10px 12px',
+                                  fontSize: '15px',
+                                  fontWeight: 600,
+                                  outline: 'none',
+                                  transition: 'all 0.2s ease',
+                                }}
+                                onFocus={(e) => {
+                                  e.target.style.borderColor = 'rgba(139, 92, 246, 0.6)';
+                                  e.target.style.background = 'rgba(255, 255, 255, 0.12)';
+                                }}
+                                onBlur={(e) => {
+                                  e.target.style.borderColor = 'rgba(255, 255, 255, 0.15)';
+                                  e.target.style.background = 'rgba(255, 255, 255, 0.08)';
+                                }}
+                              />
+                              <div style={{
+                                fontSize: '11px',
+                                color: 'rgba(255, 255, 255, 0.5)',
+                                marginTop: '4px',
+                              }}>
+                                annual %
+                              </div>
+                            </div>
+
+                            {/* Property Tax Rate */}
+                            <div style={{
+                              border: '1px solid rgba(255, 255, 255, 0.1)',
+                              borderRadius: '12px',
+                              padding: '16px',
+                              background: 'rgba(255, 255, 255, 0.03)',
+                              transition: 'all 0.2s ease',
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.borderColor = 'rgba(139, 92, 246, 0.4)';
+                              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)';
+                              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.03)';
+                            }}
+                            >
+                              <div style={{
+                                fontSize: '12px',
+                                color: 'rgba(255, 255, 255, 0.65)',
+                                marginBottom: '8px',
+                                fontWeight: 500,
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.5px',
+                              }}>
+                                Property Tax Rate
+                              </div>
+                              <input
+                                type="number"
+                                step="0.1"
+                                value={getAdvancedValue('propertyTaxRate') as number}
+                                onChange={(e) => handleAdvancedFieldChange('propertyTaxRate', Number(e.target.value))}
+                                style={{
+                                  width: '100%',
+                                  borderRadius: '8px',
+                                  border: '1px solid rgba(255, 255, 255, 0.15)',
+                                  background: 'rgba(255, 255, 255, 0.08)',
+                                  color: 'rgba(255, 255, 255, 0.95)',
+                                  padding: '10px 12px',
+                                  fontSize: '15px',
+                                  fontWeight: 600,
+                                  outline: 'none',
+                                  transition: 'all 0.2s ease',
+                                }}
+                                onFocus={(e) => {
+                                  e.target.style.borderColor = 'rgba(139, 92, 246, 0.6)';
+                                  e.target.style.background = 'rgba(255, 255, 255, 0.12)';
+                                }}
+                                onBlur={(e) => {
+                                  e.target.style.borderColor = 'rgba(255, 255, 255, 0.15)';
+                                  e.target.style.background = 'rgba(255, 255, 255, 0.08)';
+                                }}
+                              />
+                              <div style={{
+                                fontSize: '11px',
+                                color: 'rgba(255, 255, 255, 0.5)',
+                                marginTop: '4px',
+                              }}>
+                                annual %
+                              </div>
+                            </div>
+
+                            {/* Maintenance Rate */}
+                            <div style={{
+                              border: '1px solid rgba(255, 255, 255, 0.1)',
+                              borderRadius: '12px',
+                              padding: '16px',
+                              background: 'rgba(255, 255, 255, 0.03)',
+                              transition: 'all 0.2s ease',
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.borderColor = 'rgba(139, 92, 246, 0.4)';
+                              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)';
+                              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.03)';
+                            }}
+                            >
+                              <div style={{
+                                fontSize: '12px',
+                                color: 'rgba(255, 255, 255, 0.65)',
+                                marginBottom: '8px',
+                                fontWeight: 500,
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.5px',
+                              }}>
+                                Maintenance Rate
+                              </div>
+                              <input
+                                type="number"
+                                step="0.1"
+                                value={getAdvancedValue('maintenanceRate') as number}
+                                onChange={(e) => handleAdvancedFieldChange('maintenanceRate', Number(e.target.value))}
+                                style={{
+                                  width: '100%',
+                                  borderRadius: '8px',
+                                  border: '1px solid rgba(255, 255, 255, 0.15)',
+                                  background: 'rgba(255, 255, 255, 0.08)',
+                                  color: 'rgba(255, 255, 255, 0.95)',
+                                  padding: '10px 12px',
+                                  fontSize: '15px',
+                                  fontWeight: 600,
+                                  outline: 'none',
+                                  transition: 'all 0.2s ease',
+                                }}
+                                onFocus={(e) => {
+                                  e.target.style.borderColor = 'rgba(139, 92, 246, 0.6)';
+                                  e.target.style.background = 'rgba(255, 255, 255, 0.12)';
+                                }}
+                                onBlur={(e) => {
+                                  e.target.style.borderColor = 'rgba(255, 255, 255, 0.15)';
+                                  e.target.style.background = 'rgba(255, 255, 255, 0.08)';
+                                }}
+                              />
+                              <div style={{
+                                fontSize: '11px',
+                                color: 'rgba(255, 255, 255, 0.5)',
+                                marginTop: '4px',
+                              }}>
+                                annual %
+                              </div>
+                            </div>
+
+                            {/* Home Insurance */}
+                            <div style={{
+                              border: '1px solid rgba(255, 255, 255, 0.1)',
+                              borderRadius: '12px',
+                              padding: '16px',
+                              background: 'rgba(255, 255, 255, 0.03)',
+                              transition: 'all 0.2s ease',
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.borderColor = 'rgba(139, 92, 246, 0.4)';
+                              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)';
+                              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.03)';
+                            }}
+                            >
+                              <div style={{
+                                fontSize: '12px',
+                                color: 'rgba(255, 255, 255, 0.65)',
+                                marginBottom: '8px',
+                                fontWeight: 500,
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.5px',
+                              }}>
+                                Home Insurance
+                              </div>
+                              <input
+                                type="number"
+                                step="100"
+                                value={getAdvancedValue('homeInsuranceAnnual') as number}
+                                onChange={(e) => handleAdvancedFieldChange('homeInsuranceAnnual', Number(e.target.value))}
+                                style={{
+                                  width: '100%',
+                                  borderRadius: '8px',
+                                  border: '1px solid rgba(255, 255, 255, 0.15)',
+                                  background: 'rgba(255, 255, 255, 0.08)',
+                                  color: 'rgba(255, 255, 255, 0.95)',
+                                  padding: '10px 12px',
+                                  fontSize: '15px',
+                                  fontWeight: 600,
+                                  outline: 'none',
+                                  transition: 'all 0.2s ease',
+                                }}
+                                onFocus={(e) => {
+                                  e.target.style.borderColor = 'rgba(139, 92, 246, 0.6)';
+                                  e.target.style.background = 'rgba(255, 255, 255, 0.12)';
+                                }}
+                                onBlur={(e) => {
+                                  e.target.style.borderColor = 'rgba(255, 255, 255, 0.15)';
+                                  e.target.style.background = 'rgba(255, 255, 255, 0.08)';
+                                }}
+                              />
+                              <div style={{
+                                fontSize: '11px',
+                                color: 'rgba(255, 255, 255, 0.5)',
+                                marginTop: '4px',
+                              }}>
+                                $ / year
+                              </div>
+                            </div>
+
+                            {/* HOA Dues */}
+                            <div style={{
+                              border: '1px solid rgba(255, 255, 255, 0.1)',
+                              borderRadius: '12px',
+                              padding: '16px',
+                              background: 'rgba(255, 255, 255, 0.03)',
+                              transition: 'all 0.2s ease',
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.borderColor = 'rgba(139, 92, 246, 0.4)';
+                              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)';
+                              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.03)';
+                            }}
+                            >
+                              <div style={{
+                                fontSize: '12px',
+                                color: 'rgba(255, 255, 255, 0.65)',
+                                marginBottom: '8px',
+                                fontWeight: 500,
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.5px',
+                              }}>
+                                HOA Dues
+                              </div>
+                              <input
+                                type="number"
+                                step="10"
+                                value={getAdvancedValue('hoaMonthly') as number}
+                                onChange={(e) => handleAdvancedFieldChange('hoaMonthly', Number(e.target.value))}
+                                style={{
+                                  width: '100%',
+                                  borderRadius: '8px',
+                                  border: '1px solid rgba(255, 255, 255, 0.15)',
+                                  background: 'rgba(255, 255, 255, 0.08)',
+                                  color: 'rgba(255, 255, 255, 0.95)',
+                                  padding: '10px 12px',
+                                  fontSize: '15px',
+                                  fontWeight: 600,
+                                  outline: 'none',
+                                  transition: 'all 0.2s ease',
+                                }}
+                                onFocus={(e) => {
+                                  e.target.style.borderColor = 'rgba(139, 92, 246, 0.6)';
+                                  e.target.style.background = 'rgba(255, 255, 255, 0.12)';
+                                }}
+                                onBlur={(e) => {
+                                  e.target.style.borderColor = 'rgba(255, 255, 255, 0.15)';
+                                  e.target.style.background = 'rgba(255, 255, 255, 0.08)';
+                                }}
+                              />
+                              <div style={{
+                                fontSize: '11px',
+                                color: 'rgba(255, 255, 255, 0.5)',
+                                marginTop: '4px',
+                              }}>
+                                $ / month
+                              </div>
+                            </div>
+
+                            {/* Renter Insurance */}
+                            <div style={{
+                              border: '1px solid rgba(255, 255, 255, 0.1)',
+                              borderRadius: '12px',
+                              padding: '16px',
+                              background: 'rgba(255, 255, 255, 0.03)',
+                              transition: 'all 0.2s ease',
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.borderColor = 'rgba(139, 92, 246, 0.4)';
+                              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)';
+                              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.03)';
+                            }}
+                            >
+                              <div style={{
+                                fontSize: '12px',
+                                color: 'rgba(255, 255, 255, 0.65)',
+                                marginBottom: '8px',
+                                fontWeight: 500,
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.5px',
+                              }}>
+                                Renter Insurance
+                              </div>
+                              <input
+                                type="number"
+                                step="50"
+                                value={getAdvancedValue('renterInsuranceAnnual') as number}
+                                onChange={(e) => handleAdvancedFieldChange('renterInsuranceAnnual', Number(e.target.value))}
+                                style={{
+                                  width: '100%',
+                                  borderRadius: '8px',
+                                  border: '1px solid rgba(255, 255, 255, 0.15)',
+                                  background: 'rgba(255, 255, 255, 0.08)',
+                                  color: 'rgba(255, 255, 255, 0.95)',
+                                  padding: '10px 12px',
+                                  fontSize: '15px',
+                                  fontWeight: 600,
+                                  outline: 'none',
+                                  transition: 'all 0.2s ease',
+                                }}
+                                onFocus={(e) => {
+                                  e.target.style.borderColor = 'rgba(139, 92, 246, 0.6)';
+                                  e.target.style.background = 'rgba(255, 255, 255, 0.12)';
+                                }}
+                                onBlur={(e) => {
+                                  e.target.style.borderColor = 'rgba(255, 255, 255, 0.15)';
+                                  e.target.style.background = 'rgba(255, 255, 255, 0.08)';
+                                }}
+                              />
+                              <div style={{
+                                fontSize: '11px',
+                                color: 'rgba(255, 255, 255, 0.5)',
+                                marginTop: '4px',
+                              }}>
+                                $ / year
+                              </div>
+                            </div>
+
+                            {/* Closing Costs */}
+                            <div style={{
+                              border: '1px solid rgba(255, 255, 255, 0.1)',
+                              borderRadius: '12px',
+                              padding: '16px',
+                              background: 'rgba(255, 255, 255, 0.03)',
+                              transition: 'all 0.2s ease',
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.borderColor = 'rgba(139, 92, 246, 0.4)';
+                              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)';
+                              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.03)';
+                            }}
+                            >
+                              <div style={{
+                                fontSize: '12px',
+                                color: 'rgba(255, 255, 255, 0.65)',
+                                marginBottom: '8px',
+                                fontWeight: 500,
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.5px',
+                              }}>
+                                Closing Costs
+                              </div>
+                              <input
+                                type="number"
+                                step="0.1"
+                                value={(getAdvancedValue('closingCostsPercent') as number) ?? 3}
+                                onChange={(e) => handleAdvancedFieldChange('closingCostsPercent', Number(e.target.value))}
+                                style={{
+                                  width: '100%',
+                                  borderRadius: '8px',
+                                  border: '1px solid rgba(255, 255, 255, 0.15)',
+                                  background: 'rgba(255, 255, 255, 0.08)',
+                                  color: 'rgba(255, 255, 255, 0.95)',
+                                  padding: '10px 12px',
+                                  fontSize: '15px',
+                                  fontWeight: 600,
+                                  outline: 'none',
+                                  transition: 'all 0.2s ease',
+                                }}
+                                onFocus={(e) => {
+                                  e.target.style.borderColor = 'rgba(139, 92, 246, 0.6)';
+                                  e.target.style.background = 'rgba(255, 255, 255, 0.12)';
+                                }}
+                                onBlur={(e) => {
+                                  e.target.style.borderColor = 'rgba(255, 255, 255, 0.15)';
+                                  e.target.style.background = 'rgba(255, 255, 255, 0.08)';
+                                }}
+                              />
+                              <div style={{
+                                fontSize: '11px',
+                                color: 'rgba(255, 255, 255, 0.5)',
+                                marginTop: '4px',
+                              }}>
+                                % of purchase price
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </>,
+                    document.body
+                  )}
+
+                  {/* Modal 2: Rent Details */}
+                  {showRentDetails && !isLocationEditMode && createPortal(
+                    <>
+                      <div
+                        onClick={() => setShowRentDetails(false)}
+                        style={{
+                          position: 'fixed',
+                          top: 0,
+                          left: 0,
+                          right: 0,
+                          bottom: 0,
+                          background: 'rgba(0, 0, 0, 0.75)',
+                          backdropFilter: 'blur(8px)',
+                          WebkitBackdropFilter: 'blur(8px)',
+                          zIndex: 10005,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          padding: '20px',
+                        }}
+                      >
+                        <div
+                          onClick={(e) => e.stopPropagation()}
+                          style={{
+                            background: 'linear-gradient(135deg, rgba(12, 16, 27, 0.98) 0%, rgba(15, 23, 42, 0.98) 100%)',
+                            border: '1px solid rgba(139, 92, 246, 0.3)',
+                            borderRadius: '20px',
+                            padding: '32px',
+                            maxWidth: '700px',
+                            width: '100%',
+                            maxHeight: '90vh',
+                            overflowY: 'auto',
+                            boxShadow: '0 20px 60px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(139, 92, 246, 0.1)',
+                            zIndex: 10006,
+                            position: 'relative',
+                          }}
+                        >
+                          <button
+                            onClick={() => setShowRentDetails(false)}
+                            style={{
+                              position: 'absolute',
+                              top: '20px',
+                              right: '20px',
+                              background: 'rgba(255, 255, 255, 0.1)',
+                              border: '1px solid rgba(255, 255, 255, 0.15)',
+                              borderRadius: '50%',
+                              width: '32px',
+                              height: '32px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              cursor: 'pointer',
+                              color: 'rgba(255, 255, 255, 0.8)',
+                              fontSize: '18px',
+                              transition: 'all 0.2s ease',
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)';
+                              e.currentTarget.style.borderColor = 'rgba(139, 92, 246, 0.5)';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
+                              e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.15)';
+                            }}
+                          >
+                            ×
+                          </button>
+                          <div style={{ marginBottom: '24px', paddingRight: '40px' }}>
+                            <h3 style={{
+                              margin: '0 0 8px 0',
+                              fontSize: '24px',
+                              fontWeight: 600,
+                              color: 'rgba(255, 255, 255, 0.95)',
+                              background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(139, 92, 246, 0.9) 100%)',
+                              WebkitBackgroundClip: 'text',
+                              WebkitTextFillColor: 'transparent',
+                              backgroundClip: 'text',
+                            }}>
+                              Loan Details
+                            </h3>
+                            <p style={{
+                              margin: 0,
+                              fontSize: '14px',
+                              color: 'rgba(255, 255, 255, 0.65)',
+                              lineHeight: '1.5',
+                            }}>
+                              Configure mortgage loan terms including interest rate, loan term, and down payment.
+                            </p>
+                          </div>
+                          <div style={{
+                            display: 'grid',
+                            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                            gap: '16px',
+                          }}>
+                            {/* Down Payment Percentage */}
+                            <div style={{
+                              border: '1px solid rgba(255, 255, 255, 0.1)',
+                              borderRadius: '12px',
+                              padding: '16px',
+                              background: 'rgba(255, 255, 255, 0.03)',
+                              transition: 'all 0.2s ease',
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.borderColor = 'rgba(139, 92, 246, 0.4)';
+                              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)';
+                              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.03)';
+                            }}
+                            >
+                              <div style={{
+                                fontSize: '12px',
+                                color: 'rgba(255, 255, 255, 0.65)',
+                                marginBottom: '8px',
+                                fontWeight: 500,
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.5px',
+                              }}>
+                                Down Payment
+                              </div>
+                              <input
+                                type="number"
+                                step="1"
+                                min="0"
+                                max="100"
+                                value={userData.downPaymentPercent ?? ''}
+                                onChange={(e) => {
+                                  const value = e.target.value === '' ? null : Number(e.target.value);
+                                  setUserData(prev => ({ ...prev, downPaymentPercent: value }));
+                                }}
+                                placeholder="20"
+                                style={{
+                                  width: '100%',
+                                  borderRadius: '8px',
+                                  border: '1px solid rgba(255, 255, 255, 0.15)',
+                                  background: 'rgba(255, 255, 255, 0.08)',
+                                  color: 'rgba(255, 255, 255, 0.95)',
+                                  padding: '10px 12px',
+                                  fontSize: '15px',
+                                  fontWeight: 600,
+                                  outline: 'none',
+                                  transition: 'all 0.2s ease',
+                                }}
+                                onFocus={(e) => {
+                                  e.target.style.borderColor = 'rgba(139, 92, 246, 0.6)';
+                                  e.target.style.background = 'rgba(255, 255, 255, 0.12)';
+                                }}
+                                onBlur={(e) => {
+                                  e.target.style.borderColor = 'rgba(255, 255, 255, 0.15)';
+                                  e.target.style.background = 'rgba(255, 255, 255, 0.08)';
+                                }}
+                              />
+                              <div style={{
+                                fontSize: '11px',
+                                color: 'rgba(255, 255, 255, 0.5)',
+                                marginTop: '4px',
+                              }}>
+                                %
+                              </div>
+                            </div>
+
+                            {/* Loan Term */}
+                            <div style={{
+                              border: '1px solid rgba(255, 255, 255, 0.1)',
+                              borderRadius: '12px',
+                              padding: '16px',
+                              background: 'rgba(255, 255, 255, 0.03)',
+                              transition: 'all 0.2s ease',
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.borderColor = 'rgba(139, 92, 246, 0.4)';
+                              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)';
+                              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.03)';
+                            }}
+                            >
+                              <div style={{
+                                fontSize: '12px',
+                                color: 'rgba(255, 255, 255, 0.65)',
+                                marginBottom: '8px',
+                                fontWeight: 500,
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.5px',
+                              }}>
+                                Loan Term
+                              </div>
+                              <input
+                                type="number"
+                                step="1"
+                                value={getAdvancedValue('loanTermYears') as number}
+                                onChange={(e) => handleAdvancedFieldChange('loanTermYears', Number(e.target.value))}
+                                style={{
+                                  width: '100%',
+                                  borderRadius: '8px',
+                                  border: '1px solid rgba(255, 255, 255, 0.15)',
+                                  background: 'rgba(255, 255, 255, 0.08)',
+                                  color: 'rgba(255, 255, 255, 0.95)',
+                                  padding: '10px 12px',
+                                  fontSize: '15px',
+                                  fontWeight: 600,
+                                  outline: 'none',
+                                  transition: 'all 0.2s ease',
+                                }}
+                                onFocus={(e) => {
+                                  e.target.style.borderColor = 'rgba(139, 92, 246, 0.6)';
+                                  e.target.style.background = 'rgba(255, 255, 255, 0.12)';
+                                }}
+                                onBlur={(e) => {
+                                  e.target.style.borderColor = 'rgba(255, 255, 255, 0.15)';
+                                  e.target.style.background = 'rgba(255, 255, 255, 0.08)';
+                                }}
+                              />
+                              <div style={{
+                                fontSize: '11px',
+                                color: 'rgba(255, 255, 255, 0.5)',
+                                marginTop: '4px',
+                              }}>
+                                years
+                              </div>
+                            </div>
+
+                            {/* Mortgage Rate */}
+                            <div style={{
+                              border: '1px solid rgba(255, 255, 255, 0.1)',
+                              borderRadius: '12px',
+                              padding: '16px',
+                              background: 'rgba(255, 255, 255, 0.03)',
+                              transition: 'all 0.2s ease',
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.borderColor = 'rgba(139, 92, 246, 0.4)';
+                              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)';
+                              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.03)';
+                            }}
+                            >
+                              <div style={{
+                                fontSize: '12px',
+                                color: 'rgba(255, 255, 255, 0.65)',
+                                marginBottom: '8px',
+                                fontWeight: 500,
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.5px',
+                              }}>
+                                Mortgage Rate
+                              </div>
+                              <input
+                                type="number"
+                                step="0.1"
+                                value={getAdvancedValue('interestRate') as number}
+                                onChange={(e) => handleAdvancedFieldChange('interestRate', Number(e.target.value))}
+                                style={{
+                                  width: '100%',
+                                  borderRadius: '8px',
+                                  border: '1px solid rgba(255, 255, 255, 0.15)',
+                                  background: 'rgba(255, 255, 255, 0.08)',
+                                  color: 'rgba(255, 255, 255, 0.95)',
+                                  padding: '10px 12px',
+                                  fontSize: '15px',
+                                  fontWeight: 600,
+                                  outline: 'none',
+                                  transition: 'all 0.2s ease',
+                                }}
+                                onFocus={(e) => {
+                                  e.target.style.borderColor = 'rgba(139, 92, 246, 0.6)';
+                                  e.target.style.background = 'rgba(255, 255, 255, 0.12)';
+                                }}
+                                onBlur={(e) => {
+                                  e.target.style.borderColor = 'rgba(255, 255, 255, 0.15)';
+                                  e.target.style.background = 'rgba(255, 255, 255, 0.08)';
+                                }}
+                              />
+                              <div style={{
+                                fontSize: '11px',
+                                color: 'rgba(255, 255, 255, 0.5)',
+                                marginTop: '4px',
+                              }}>
+                                annual %
+                              </div>
+                            </div>
+
+                            {/* PMI Rate - Only show if down payment is less than 20% */}
+                            {(userData.downPaymentPercent == null || userData.downPaymentPercent < 20) && (
+                              <div style={{
+                                border: '1px solid rgba(255, 255, 255, 0.1)',
+                                borderRadius: '12px',
+                                padding: '16px',
+                                background: 'rgba(255, 255, 255, 0.03)',
+                                transition: 'all 0.2s ease',
+                              }}
+                              onMouseEnter={(e) => {
+                                e.currentTarget.style.borderColor = 'rgba(139, 92, 246, 0.4)';
+                                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)';
+                                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.03)';
+                              }}
+                              >
+                                <div style={{
+                                  fontSize: '12px',
+                                  color: 'rgba(255, 255, 255, 0.65)',
+                                  marginBottom: '8px',
+                                  fontWeight: 500,
+                                  textTransform: 'uppercase',
+                                  letterSpacing: '0.5px',
+                                }}>
+                                  PMI Rate
+                                </div>
+                                <input
+                                  type="number"
+                                  step="0.1"
+                                  value={(getAdvancedValue('pmiRate') as number) ?? 0.5}
+                                  onChange={(e) => handleAdvancedFieldChange('pmiRate', Number(e.target.value))}
+                                  style={{
+                                    width: '100%',
+                                    borderRadius: '8px',
+                                    border: '1px solid rgba(255, 255, 255, 0.15)',
+                                    background: 'rgba(255, 255, 255, 0.08)',
+                                    color: 'rgba(255, 255, 255, 0.95)',
+                                    padding: '10px 12px',
+                                    fontSize: '15px',
+                                    fontWeight: 600,
+                                    outline: 'none',
+                                    transition: 'all 0.2s ease',
+                                  }}
+                                  onFocus={(e) => {
+                                    e.target.style.borderColor = 'rgba(139, 92, 246, 0.6)';
+                                    e.target.style.background = 'rgba(255, 255, 255, 0.12)';
+                                  }}
+                                  onBlur={(e) => {
+                                    e.target.style.borderColor = 'rgba(255, 255, 255, 0.15)';
+                                    e.target.style.background = 'rgba(255, 255, 255, 0.08)';
+                                  }}
+                                />
+                                <div style={{
+                                  fontSize: '11px',
+                                  color: 'rgba(255, 255, 255, 0.5)',
+                                  marginTop: '4px',
+                                }}>
+                                  annual % of loan
+                                </div>
+                                <div style={{
+                                  fontSize: '10px',
+                                  color: 'rgba(255, 255, 255, 0.4)',
+                                  marginTop: '4px',
+                                  fontStyle: 'italic',
+                                }}>
+                                  Required when down payment &lt; 20%
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </>,
+                    document.body
+                  )}
+
+                  {/* Modal 3: Investment & Tax Details */}
+                  {showInvestmentTaxDetails && !isLocationEditMode && createPortal(
+                    <>
+                      <div
+                        onClick={() => setShowInvestmentTaxDetails(false)}
+                        style={{
+                          position: 'fixed',
+                          top: 0,
+                          left: 0,
+                          right: 0,
+                          bottom: 0,
+                          background: 'rgba(0, 0, 0, 0.75)',
+                          backdropFilter: 'blur(8px)',
+                          WebkitBackdropFilter: 'blur(8px)',
+                          zIndex: 10005,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          padding: '20px',
+                        }}
+                      >
+                        <div
+                          onClick={(e) => e.stopPropagation()}
+                          style={{
+                            background: 'linear-gradient(135deg, rgba(12, 16, 27, 0.98) 0%, rgba(15, 23, 42, 0.98) 100%)',
+                            border: '1px solid rgba(139, 92, 246, 0.3)',
+                            borderRadius: '20px',
+                            padding: '32px',
+                            maxWidth: '700px',
+                            width: '100%',
+                            maxHeight: '90vh',
+                            overflowY: 'auto',
+                            boxShadow: '0 20px 60px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(139, 92, 246, 0.1)',
+                            zIndex: 10006,
+                            position: 'relative',
+                          }}
+                        >
+                          <button
+                            onClick={() => setShowInvestmentTaxDetails(false)}
+                            style={{
+                              position: 'absolute',
+                              top: '20px',
+                              right: '20px',
+                              background: 'rgba(255, 255, 255, 0.1)',
+                              border: '1px solid rgba(255, 255, 255, 0.15)',
+                              borderRadius: '50%',
+                              width: '32px',
+                              height: '32px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              cursor: 'pointer',
+                              color: 'rgba(255, 255, 255, 0.8)',
+                              fontSize: '18px',
+                              transition: 'all 0.2s ease',
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)';
+                              e.currentTarget.style.borderColor = 'rgba(139, 92, 246, 0.5)';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
+                              e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.15)';
+                            }}
+                          >
+                            ×
+                          </button>
+                          <div style={{ marginBottom: '24px', paddingRight: '40px' }}>
+                            <h3 style={{
+                              margin: '0 0 8px 0',
+                              fontSize: '24px',
+                              fontWeight: 600,
+                              color: 'rgba(255, 255, 255, 0.95)',
+                              background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(139, 92, 246, 0.9) 100%)',
+                              WebkitBackgroundClip: 'text',
+                              WebkitTextFillColor: 'transparent',
+                              backgroundClip: 'text',
+                            }}>
+                              Investment & Tax Details
+                            </h3>
+                            <p style={{
+                              margin: 0,
+                              fontSize: '14px',
+                              color: 'rgba(255, 255, 255, 0.65)',
+                              lineHeight: '1.5',
+                            }}>
+                              Configure investment returns and tax settings for opportunity cost calculations.
+                            </p>
+                          </div>
+                          <div style={{
+                            display: 'grid',
+                            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                            gap: '16px',
+                          }}>
+                            <div style={{
+                              border: '1px solid rgba(255, 255, 255, 0.1)',
+                              borderRadius: '12px',
+                              padding: '16px',
+                              background: 'rgba(255, 255, 255, 0.03)',
+                              transition: 'all 0.2s ease',
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.borderColor = 'rgba(139, 92, 246, 0.4)';
+                              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)';
+                              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.03)';
+                            }}
+                            >
+                              <div style={{
+                                fontSize: '12px',
+                                color: 'rgba(255, 255, 255, 0.65)',
+                                marginBottom: '8px',
+                                fontWeight: 500,
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.5px',
+                              }}>
+                                Investment Return Rate
+                              </div>
+                              <input
+                                type="number"
+                                step="0.1"
+                                value={(getAdvancedValue('investmentReturnRate') as number) || 7}
+                                onChange={(e) => handleAdvancedFieldChange('investmentReturnRate', Number(e.target.value))}
+                                style={{
+                                  width: '100%',
+                                  borderRadius: '8px',
+                                  border: '1px solid rgba(255, 255, 255, 0.15)',
+                                  background: 'rgba(255, 255, 255, 0.08)',
+                                  color: 'rgba(255, 255, 255, 0.95)',
+                                  padding: '10px 12px',
+                                  fontSize: '15px',
+                                  fontWeight: 600,
+                                  outline: 'none',
+                                  transition: 'all 0.2s ease',
+                                }}
+                                onFocus={(e) => {
+                                  e.target.style.borderColor = 'rgba(139, 92, 246, 0.6)';
+                                  e.target.style.background = 'rgba(255, 255, 255, 0.12)';
+                                }}
+                                onBlur={(e) => {
+                                  e.target.style.borderColor = 'rgba(255, 255, 255, 0.15)';
+                                  e.target.style.background = 'rgba(255, 255, 255, 0.08)';
+                                }}
+                              />
+                              <div style={{
+                                fontSize: '11px',
+                                color: 'rgba(255, 255, 255, 0.5)',
+                                marginTop: '4px',
+                              }}>
+                                annual %
+                              </div>
+                            </div>
+
+                            {/* Federal Tax Rate */}
+                            <div style={{
+                              border: '1px solid rgba(255, 255, 255, 0.1)',
+                              borderRadius: '12px',
+                              padding: '16px',
+                              background: 'rgba(255, 255, 255, 0.03)',
+                              transition: 'all 0.2s ease',
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.borderColor = 'rgba(139, 92, 246, 0.4)';
+                              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)';
+                              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.03)';
+                            }}
+                            >
+                              <div style={{
+                                fontSize: '12px',
+                                color: 'rgba(255, 255, 255, 0.65)',
+                                marginBottom: '8px',
+                                fontWeight: 500,
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.5px',
+                              }}>
+                                Federal Tax Rate
+                              </div>
+                              <input
+                                type="number"
+                                step="0.1"
+                                value={(getAdvancedValue('federalTaxRate') as number) ?? 22}
+                                onChange={(e) => handleAdvancedFieldChange('federalTaxRate', Number(e.target.value))}
+                                style={{
+                                  width: '100%',
+                                  borderRadius: '8px',
+                                  border: '1px solid rgba(255, 255, 255, 0.15)',
+                                  background: 'rgba(255, 255, 255, 0.08)',
+                                  color: 'rgba(255, 255, 255, 0.95)',
+                                  padding: '10px 12px',
+                                  fontSize: '15px',
+                                  fontWeight: 600,
+                                  outline: 'none',
+                                  transition: 'all 0.2s ease',
+                                }}
+                                onFocus={(e) => {
+                                  e.target.style.borderColor = 'rgba(139, 92, 246, 0.6)';
+                                  e.target.style.background = 'rgba(255, 255, 255, 0.12)';
+                                }}
+                                onBlur={(e) => {
+                                  e.target.style.borderColor = 'rgba(255, 255, 255, 0.15)';
+                                  e.target.style.background = 'rgba(255, 255, 255, 0.08)';
+                                }}
+                              />
+                              <div style={{
+                                fontSize: '11px',
+                                color: 'rgba(255, 255, 255, 0.5)',
+                                marginTop: '4px',
+                              }}>
+                                %
+                              </div>
+                            </div>
+
+                            {/* State Tax Rate */}
+                            <div style={{
+                              border: '1px solid rgba(255, 255, 255, 0.1)',
+                              borderRadius: '12px',
+                              padding: '16px',
+                              background: 'rgba(255, 255, 255, 0.03)',
+                              transition: 'all 0.2s ease',
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.borderColor = 'rgba(139, 92, 246, 0.4)';
+                              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)';
+                              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.03)';
+                            }}
+                            >
+                              <div style={{
+                                fontSize: '12px',
+                                color: 'rgba(255, 255, 255, 0.65)',
+                                marginBottom: '8px',
+                                fontWeight: 500,
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.5px',
+                              }}>
+                                State Tax Rate
+                              </div>
+                              <input
+                                type="number"
+                                step="0.1"
+                                value={(getAdvancedValue('stateTaxRate') as number) ?? 5}
+                                onChange={(e) => handleAdvancedFieldChange('stateTaxRate', Number(e.target.value))}
+                                style={{
+                                  width: '100%',
+                                  borderRadius: '8px',
+                                  border: '1px solid rgba(255, 255, 255, 0.15)',
+                                  background: 'rgba(255, 255, 255, 0.08)',
+                                  color: 'rgba(255, 255, 255, 0.95)',
+                                  padding: '10px 12px',
+                                  fontSize: '15px',
+                                  fontWeight: 600,
+                                  outline: 'none',
+                                  transition: 'all 0.2s ease',
+                                }}
+                                onFocus={(e) => {
+                                  e.target.style.borderColor = 'rgba(139, 92, 246, 0.6)';
+                                  e.target.style.background = 'rgba(255, 255, 255, 0.12)';
+                                }}
+                                onBlur={(e) => {
+                                  e.target.style.borderColor = 'rgba(255, 255, 255, 0.15)';
+                                  e.target.style.background = 'rgba(255, 255, 255, 0.08)';
+                                }}
+                              />
+                              <div style={{
+                                fontSize: '11px',
+                                color: 'rgba(255, 255, 255, 0.5)',
+                                marginTop: '4px',
+                              }}>
+                                %
+                              </div>
+                            </div>
+
+                            {/* Tax Filing Status */}
+                            <div style={{
+                              border: '1px solid rgba(255, 255, 255, 0.1)',
+                              borderRadius: '12px',
+                              padding: '16px',
+                              background: 'rgba(255, 255, 255, 0.03)',
+                              transition: 'all 0.2s ease',
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.borderColor = 'rgba(139, 92, 246, 0.4)';
+                              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)';
+                              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.03)';
+                            }}
+                            >
+                              <div style={{
+                                fontSize: '12px',
+                                color: 'rgba(255, 255, 255, 0.65)',
+                                marginBottom: '8px',
+                                fontWeight: 500,
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.5px',
+                              }}>
+                                Tax Filing Status
+                              </div>
+                              <select
+                                value={(getAdvancedValue('taxFilingStatus') as string) || 'single'}
+                                onChange={(e) => handleAdvancedFieldChange('taxFilingStatus', e.target.value)}
+                                style={{
+                                  width: '100%',
+                                  borderRadius: '8px',
+                                  border: '1px solid rgba(255, 255, 255, 0.15)',
+                                  background: 'rgba(255, 255, 255, 0.08)',
+                                  color: 'rgba(255, 255, 255, 0.95)',
+                                  padding: '10px 12px',
+                                  fontSize: '15px',
+                                  fontWeight: 600,
+                                  outline: 'none',
+                                  transition: 'all 0.2s ease',
+                                  cursor: 'pointer',
+                                }}
+                                onFocus={(e) => {
+                                  e.target.style.borderColor = 'rgba(139, 92, 246, 0.6)';
+                                  e.target.style.background = 'rgba(255, 255, 255, 0.12)';
+                                }}
+                                onBlur={(e) => {
+                                  e.target.style.borderColor = 'rgba(255, 255, 255, 0.15)';
+                                  e.target.style.background = 'rgba(255, 255, 255, 0.08)';
+                                }}
+                              >
+                                <option value="single" style={{ background: '#1a1d29', color: 'white' }}>Single</option>
+                                <option value="married_joint" style={{ background: '#1a1d29', color: 'white' }}>Married Filing Jointly</option>
+                                <option value="married_separate" style={{ background: '#1a1d29', color: 'white' }}>Married Filing Separately</option>
+                                <option value="head_of_household" style={{ background: '#1a1d29', color: 'white' }}>Head of Household</option>
+                              </select>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </>,
+                    document.body
+                  )}
+                  {!isLocationEditMode && (
+                    <p style={locationFooterStyle}>
+                      Want to compare a different neighborhood? Just mention another ZIP or city in the chat.
+                    </p>
+                  )}
                 </>
               ) : (
                 <p style={locationDescriptionStyle}>
-                  Tell me a ZIP code like “95125” or say “Analyze Austin” and I’ll pull the local prices, rents, taxes, and growth
+                  Tell me a ZIP code like "95125" or say "Analyze Austin" and I'll pull the local prices, rents, taxes, and growth
                   rates for you.
                 </p>
               )}
             </section>
 
-            <BasicInputsCard
-              values={basicValues}
-              editingValues={editableValues ?? basicValues}
-              isEditMode={isEditMode}
-              onFieldChange={handleBasicFieldChange}
-              onEdit={handleEditValues}
-              onSave={handleSaveEdit}
-              onCancel={handleCancelEdit}
-            />
-
-            <AdvancedInputsCard
-              values={advancedInputs}
-              editingValues={editableAdvancedValues ?? advancedInputs}
-              isEditMode={isEditMode}
-              isExpanded={showAdvancedAssumptions}
-              onToggle={() => setShowAdvancedAssumptions(prev => !prev)}
-              onFieldChange={handleAdvancedFieldChange}
-            />
           </div>
         )}
 
         {/* Right Column: Chat Container */}
         <div className="rvb-right">
-          {/* Chat-level actions (outside the main box) */}
+          {/* Chat-level actions (outside the main box) - Hidden, moved to banner */}
           {activeTab === 'chat' && (
-            <div className="chat-actions-outside">
+            <div className="chat-actions-outside" style={{ display: 'none' }}>
                 <button 
                   className="save-button"
                   onClick={handleSaveChat}
@@ -3819,7 +5664,8 @@ function buildLocalAnalysis(inputs: ScenarioInputs): CalculatorOutput {
   // Buyer cash account: starts negative (money spent on down payment + closing), then tracks cash flow
   // Renter investment balance: already in MonthlySnapshot as investedDownPayment
   const downPaymentAmount = inputs.homePrice * (inputs.downPaymentPercent / 100);
-  const closingCostsBuy = inputs.homePrice * 0.03; // 3% closing costs
+  const closingCostsPercent = inputs.closingCostsPercent ?? 3.0;
+  const closingCostsBuy = inputs.homePrice * (closingCostsPercent / 100);
   const monthlyInvestmentReturn = inputs.investmentReturnRate / 100 / 12;
   
   // Start with negative cash (money spent upfront)
