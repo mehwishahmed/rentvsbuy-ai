@@ -139,8 +139,9 @@ def calculate_renting_costs(inputs: ScenarioInputs, month: int) -> RentingCosts:
     return RentingCosts(rent=monthly_rent, insurance=insurance, total=total)
 
 
-def _calculate_pmi(loan_amount: float) -> float:
-    return (loan_amount * 0.005) / 12
+def _calculate_pmi(loan_amount: float, pmi_rate: float = 0.5) -> float:
+    """Calculate PMI monthly payment. Default 0.5% annual if not specified."""
+    return (loan_amount * (pmi_rate / 100)) / 12
 
 
 def calculate_net_worth_comparison(inputs: ScenarioInputs) -> List[MonthlySnapshot]:
@@ -158,8 +159,10 @@ def calculate_net_worth_comparison(inputs: ScenarioInputs) -> List[MonthlySnapsh
     remaining_balance = loan_amount
     rent = inputs.monthlyRent
 
-    closing_costs_buy = inputs.homePrice * 0.03
-    closing_costs_sell_rate = 0.08
+    closing_costs_percent = inputs.closingCostsPercent if hasattr(inputs, 'closingCostsPercent') and inputs.closingCostsPercent is not None else 3.0
+    closing_costs_buy = inputs.homePrice * (closing_costs_percent / 100)
+    selling_costs_percent = inputs.sellingCostsPercent if hasattr(inputs, 'sellingCostsPercent') and inputs.sellingCostsPercent is not None else 6.0
+    closing_costs_sell_rate = selling_costs_percent / 100
 
     buyer_cash_account = -down_payment_amount - closing_costs_buy
     buyer_equity = down_payment_amount
@@ -186,7 +189,8 @@ def calculate_net_worth_comparison(inputs: ScenarioInputs) -> List[MonthlySnapsh
         hoa_monthly = inputs.hoaMonthly
 
         has_pmi = remaining_balance / home_value > 0.80 if home_value > 0 else False
-        pmi_monthly = _calculate_pmi(loan_amount) if has_pmi else 0.0
+        pmi_rate = inputs.pmiRate if hasattr(inputs, 'pmiRate') and inputs.pmiRate is not None else 0.5
+        pmi_monthly = _calculate_pmi(loan_amount, pmi_rate) if has_pmi else 0.0
 
         owner_monthly_cost = (
             interest_paid
@@ -201,9 +205,13 @@ def calculate_net_worth_comparison(inputs: ScenarioInputs) -> List[MonthlySnapsh
         cash_flow_diff = renter_monthly_cost - owner_monthly_cost
 
         if cash_flow_diff > 0:
-            renter_portfolio = (renter_portfolio + cash_flow_diff) * (1 + monthly_investment_return)
+            # Renting costs more - buyer saves money, invests the difference
+            buyer_cash_account = (buyer_cash_account + cash_flow_diff) * (1 + monthly_investment_return)
+            renter_portfolio = renter_portfolio * (1 + monthly_investment_return)
         else:
-            buyer_cash_account = (buyer_cash_account + (-cash_flow_diff)) * (1 + monthly_investment_return)
+            # Owning costs more - renter saves money, invests the difference
+            renter_portfolio = (renter_portfolio + abs(cash_flow_diff)) * (1 + monthly_investment_return)
+            buyer_cash_account = buyer_cash_account * (1 + monthly_investment_return)
 
         is_final_month = month == timeline_months
         selling_costs = home_value * closing_costs_sell_rate if is_final_month else 0.0
@@ -273,8 +281,10 @@ def calculate_unified_analysis(inputs: ScenarioInputs) -> AnalysisResult:
     remaining_balance = loan_amount
     rent = inputs.monthlyRent
 
-    closing_costs_buy = inputs.homePrice * 0.03
-    closing_costs_sell_rate = 0.08
+    closing_costs_percent = inputs.closingCostsPercent if hasattr(inputs, 'closingCostsPercent') and inputs.closingCostsPercent is not None else 3.0
+    closing_costs_buy = inputs.homePrice * (closing_costs_percent / 100)
+    selling_costs_percent = inputs.sellingCostsPercent if hasattr(inputs, 'sellingCostsPercent') and inputs.sellingCostsPercent is not None else 6.0
+    closing_costs_sell_rate = selling_costs_percent / 100
 
     buyer_cash_account = -down_payment_amount - closing_costs_buy
     buyer_equity = down_payment_amount
@@ -305,7 +315,8 @@ def calculate_unified_analysis(inputs: ScenarioInputs) -> AnalysisResult:
         hoa_monthly = inputs.hoaMonthly
 
         has_pmi = remaining_balance / home_value > 0.80 if home_value > 0 else False
-        pmi_monthly = _calculate_pmi(loan_amount) if has_pmi else 0.0
+        pmi_rate = inputs.pmiRate if hasattr(inputs, 'pmiRate') and inputs.pmiRate is not None else 0.5
+        pmi_monthly = _calculate_pmi(loan_amount, pmi_rate) if has_pmi else 0.0
 
         owner_monthly_cost = (
             interest_paid
@@ -320,9 +331,13 @@ def calculate_unified_analysis(inputs: ScenarioInputs) -> AnalysisResult:
         cash_flow_diff = renter_monthly_cost - owner_monthly_cost
 
         if cash_flow_diff > 0:
-            renter_portfolio = (renter_portfolio + cash_flow_diff) * (1 + monthly_investment_return)
+            # Renting costs more - buyer saves money, invests the difference
+            buyer_cash_account = (buyer_cash_account + cash_flow_diff) * (1 + monthly_investment_return)
+            renter_portfolio = renter_portfolio * (1 + monthly_investment_return)
         else:
-            buyer_cash_account = (buyer_cash_account + (-cash_flow_diff)) * (1 + monthly_investment_return)
+            # Owning costs more - renter saves money, invests the difference
+            renter_portfolio = (renter_portfolio + abs(cash_flow_diff)) * (1 + monthly_investment_return)
+            buyer_cash_account = buyer_cash_account * (1 + monthly_investment_return)
 
         is_final_month = month == timeline_months
         selling_costs = home_value * closing_costs_sell_rate if is_final_month else 0.0

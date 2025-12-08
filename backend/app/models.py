@@ -23,6 +23,14 @@ class ScenarioInputs(BaseModel):
     homeAppreciationRate: float = Field(..., ge=-100)
     rentGrowthRate: float = Field(..., ge=-100)
     investmentReturnRate: float = Field(..., ge=-100)
+    # Optional additional costs
+    closingCostsPercent: Optional[float] = Field(None, ge=0, le=100)
+    pmiRate: Optional[float] = Field(None, ge=0, le=10)
+    sellingCostsPercent: Optional[float] = Field(None, ge=0, le=100)
+    # Optional tax information
+    federalTaxRate: Optional[float] = Field(None, ge=0, le=100)
+    stateTaxRate: Optional[float] = Field(None, ge=0, le=100)
+    taxFilingStatus: Optional[str] = Field(None)
 
 
 class MonthlySnapshot(BaseModel):
@@ -244,3 +252,18 @@ class ChartInsightRequest(BaseModel):
 
 class ChartInsightResponse(BaseModel):
     answer: str
+
+
+class SummaryInsightRequest(BaseModel):
+    zipCode: Optional[str] = None
+    timelineYears: int
+    buyNetWorth: List[float]
+    rentNetWorth: List[float]
+    breakEvenYear: Optional[int] = None
+    finalDelta: float
+    homeAppreciationRate: float
+    rentGrowthRate: float
+
+
+class SummaryInsightResponse(BaseModel):
+    insight: str

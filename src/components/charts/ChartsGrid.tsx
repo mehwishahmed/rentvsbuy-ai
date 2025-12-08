@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
+import { captureElementToCanvas } from '../../lib/export/html2canvasExport';
 import { NetWorthChart } from './NetWorthChart';
 import { MonthlyCostChart } from './MonthlyCostChart';
 import { TotalCostChart } from './TotalCostChart';
@@ -161,6 +162,23 @@ const chartTitles: Record<ChartType, string> = {
   sensitivity: 'Sensitivity Analysis',
 };
 
+const chartIcons: Record<ChartType, string> = {
+  monthlyCost: '💰',
+  netWorth: '📊',
+  equity: '🏠',
+  totalCost: '💸',
+  monteCarlo: '🎲',
+  breakEven: '⚖️',
+  breakEvenHeatmap: '🔥',
+  cashFlow: '💵',
+  cumulativeCost: '📈',
+  liquidity: '💧',
+  rentGrowth: '📉',
+  taxSavings: '🧾',
+  scenarioOverlay: '🔮',
+  sensitivity: '🎯',
+};
+
 export function ChartsGrid({
   snapshotData,
   timeline,
@@ -203,6 +221,8 @@ export function ChartsGrid({
   const [insightLoading, setInsightLoading] = useState(false);
   const [insightConversation, setInsightConversation] = useState<Array<{ question: string; answer: string }>>([]);
   const [insightConversationSaved, setInsightConversationSaved] = useState(false);
+  const [chartOneLiner, setChartOneLiner] = useState<string | null>(null);
+  const [oneLinerLoading, setOneLinerLoading] = useState(false);
   const insightCacheRef = useRef<Map<string, string>>(new Map());
 
   // Recalculate timeline when assumptions change
@@ -758,14 +778,14 @@ export function ChartsGrid({
           return null;
         }
         const sampledIndexes = downsample(
-          monteCarloSummary.years.map((_, index) => index),
+          monteCarloSummary.years.map((_: number, index: number) => index),
           40,
-        );
+        ) as number[];
         payload = {
-          years: sampledIndexes.map(index => monteCarloSummary.years[index]),
-          p10: sampledIndexes.map(index => monteCarloSummary.p10[index]),
-          p50: sampledIndexes.map(index => monteCarloSummary.p50[index]),
-          p90: sampledIndexes.map(index => monteCarloSummary.p90[index]),
+          years: sampledIndexes.map((index: number) => monteCarloSummary.years[index]),
+          p10: sampledIndexes.map((index: number) => monteCarloSummary.p10[index]),
+          p50: sampledIndexes.map((index: number) => monteCarloSummary.p50[index]),
+          p90: sampledIndexes.map((index: number) => monteCarloSummary.p90[index]),
         };
         break;
       case 'sensitivity':
@@ -799,6 +819,77 @@ export function ChartsGrid({
     return { payload, signature };
   };
 
+  const generateChartOneLiner = async (chartType: ChartType) => {
+    console.log('[ONE-LINER] Starting generation for chart:', chartType);
+    const payloadInfo = buildChartInsightPayload(chartType);
+    if (!payloadInfo) {
+      console.log('[ONE-LINER] No payload info available');
+      return;
+    }
+    
+    const { payload: chartPayload } = payloadInfo;
+    const cacheKey = `${chartType}:one-liner:${JSON.stringify(chartPayload).slice(0, 100)}`;
+    
+    // Check cache first
+    if (insightCacheRef.current.has(cacheKey)) {
+      const cached = insightCacheRef.current.get(cacheKey) ?? null;
+      console.log('[ONE-LINER] Using cached one-liner:', cached);
+      setChartOneLiner(cached);
+      return;
+    }
+    
+    try {
+      setOneLinerLoading(true);
+      console.log('[ONE-LINER] Fetching from API...', { chartType, chartName: chartTitles[chartType] });
+      
+      // Use the streaming endpoint but collect all chunks
+      let fullAnswer = '';
+      
+      await new Promise<void>((resolve, reject) => {
+        const abortStream = fetchChartInsightStream(
+          {
+            chartName: chartTitles[chartType],
+            chartData: chartPayload,
+            question: 'What does this chart tell me about my situation? Give me one clear sentence (15-25 words) that gets straight to the point.',
+          },
+          (chunk) => {
+            fullAnswer += chunk;
+            console.log('[ONE-LINER] Received chunk:', chunk);
+            // Update in real-time as chunks come in
+            if (fullAnswer.trim().length > 0) {
+              setChartOneLiner(fullAnswer.trim());
+            }
+          },
+          (error) => {
+            console.error('[ONE-LINER] Stream error:', error);
+            setChartOneLiner(null);
+            reject(error);
+          },
+          () => {
+            const oneLiner = fullAnswer.trim();
+            console.log('[ONE-LINER] Stream complete, full answer:', oneLiner);
+            if (oneLiner && oneLiner.length > 0) {
+              setChartOneLiner(oneLiner);
+              insightCacheRef.current.set(cacheKey, oneLiner);
+            } else {
+              console.warn('[ONE-LINER] Empty response received');
+              setChartOneLiner(null);
+            }
+            resolve();
+          }
+        );
+        
+        // Store abort function in case we need to cancel
+        (generateChartOneLiner as any).abort = abortStream;
+      });
+    } catch (error: any) {
+      console.error('[ONE-LINER] Error generating chart one-liner:', error);
+      setChartOneLiner(null);
+    } finally {
+      setOneLinerLoading(false);
+    }
+  };
+
   const handleChartClick = (chartType: ChartType) => {
     if (!hasChartData(chartType)) {
       return;
@@ -808,6 +899,9 @@ export function ChartsGrid({
     setInsightError(null);
     setInsightConversation([]);
     setInsightConversationSaved(false);
+    setChartOneLiner(null);
+    // Generate one-liner when chart opens
+    generateChartOneLiner(chartType);
   };
 
   const handleCloseInsight = async () => {
@@ -832,6 +926,7 @@ export function ChartsGrid({
     setInsightConversation([]);
     setInsightAnswer(null);
     setInsightConversationSaved(false);
+    setChartOneLiner(null);
   };
 
   useEffect(() => {
@@ -874,6 +969,9 @@ export function ChartsGrid({
       return;
     }
 
+    console.log('[INSIGHTS AI] 🚀 Requesting...', { chart: selectedChart });
+    const startTime = Date.now();
+    
     try {
       setInsightLoading(true);
       setInsightError(null);
@@ -892,12 +990,16 @@ export function ChartsGrid({
           setInsightAnswer(fullAnswer);
         },
         (error) => {
-          setInsightError(error.message ?? 'Unable to fetch insight.');
+          const duration = Date.now() - startTime;
+          console.error('[INSIGHTS AI] ❌ Error', { error: error?.message || 'Unknown', duration: `${(duration / 1000).toFixed(1)}s` });
+          setInsightError(error?.message ?? 'Unable to fetch insight. Please check if the backend is running.');
           setInsightLoading(false);
         },
         () => {
+          const duration = Date.now() - startTime;
+          console.log('[INSIGHTS AI] ✅ Complete', { length: fullAnswer.length, duration: `${(duration / 1000).toFixed(1)}s` });
           insightCacheRef.current.set(cacheKey, fullAnswer);
-          setInsightConversation([...insightConversation, { question: trimmedQuestion, answer: fullAnswer }]);
+          setInsightConversation(prev => [...prev, { question: trimmedQuestion, answer: fullAnswer }]);
           setInsightAnswer(null);
           setInsightLoading(false);
         }
@@ -906,6 +1008,8 @@ export function ChartsGrid({
       // Store abort function for cleanup if needed
       (handleInsightSubmit as any).abort = abortStream;
     } catch (error: any) {
+      const duration = Date.now() - startTime;
+      console.error('[INSIGHTS AI] ❌ Exception', { error: error?.message || 'Unknown', duration: `${(duration / 1000).toFixed(1)}s` });
       setInsightError(error.message ?? 'Unable to fetch insight.');
       setInsightLoading(false);
     }
@@ -941,11 +1045,198 @@ export function ChartsGrid({
           if (clonedElement) {
             clonedElement.style.backgroundColor = '#ffffff';
             clonedElement.style.background = '#ffffff';
+            clonedElement.style.opacity = '1';
+            clonedElement.style.filter = 'none';
             // Also update any child chart containers
-            const chartContainers = clonedElement.querySelectorAll('.chart-container, .chart-wrapper');
+            const chartContainers = clonedElement.querySelectorAll('.chart-container, .chart-wrapper, .recharts-wrapper, .recharts-surface');
             chartContainers.forEach((container: Element) => {
-              (container as HTMLElement).style.backgroundColor = '#ffffff';
-              (container as HTMLElement).style.background = '#ffffff';
+              const el = container as HTMLElement;
+              el.style.backgroundColor = '#ffffff';
+              el.style.background = '#ffffff';
+              el.style.opacity = '1';
+              el.style.filter = 'none';
+            });
+            
+            // Remove ALL opacity and transparency from ALL elements - CRITICAL for PDF visibility
+            const allElements = clonedElement.querySelectorAll('*');
+            allElements.forEach((el: Element) => {
+              const htmlEl = el as HTMLElement;
+              // Force opacity to 1 via inline style (highest priority)
+              htmlEl.style.setProperty('opacity', '1', 'important');
+              htmlEl.style.setProperty('filter', 'none', 'important');
+              htmlEl.style.setProperty('backdrop-filter', 'none', 'important');
+              
+              // Also set opacity attribute if it's an SVG element
+              if (el instanceof SVGElement) {
+                el.setAttribute('opacity', '1');
+              }
+              
+              // Fix any rgba backgrounds
+              const bgColor = htmlEl.style.backgroundColor;
+              if (bgColor && bgColor.includes('rgba')) {
+                htmlEl.style.setProperty('background-color', '#ffffff', 'important');
+              }
+            });
+            
+            // AGGRESSIVELY enhance ALL chart colors for PDF - target EVERYTHING
+            const svgElements = clonedElement.querySelectorAll('svg');
+            svgElements.forEach((svg: Element) => {
+              const svgEl = svg as SVGElement;
+              // Force SVG to be fully opaque - use both style and attribute
+              (svgEl as any).style.setProperty('opacity', '1', 'important');
+              (svgEl as any).style.setProperty('filter', 'none', 'important');
+              svgEl.setAttribute('opacity', '1');
+              
+              // Force all groups inside SVG to be opaque
+              const allGroups = svgEl.querySelectorAll('g');
+              allGroups.forEach((g: Element) => {
+                const group = g as SVGGElement;
+                group.setAttribute('opacity', '1');
+                (group as any).style.setProperty('opacity', '1', 'important');
+              });
+              
+              // Force ALL paths to be dark and visible - don't check classes, just get all paths
+              const allPaths = svgEl.querySelectorAll('path');
+              allPaths.forEach((pathEl: Element) => {
+                const path = pathEl as SVGPathElement;
+                const stroke = path.getAttribute('stroke');
+                const fill = path.getAttribute('fill');
+                
+                // Force stroke to be dark if it exists - ALWAYS set opacity to 1
+                path.setAttribute('opacity', '1');
+                if (stroke && stroke !== 'none') {
+                  if (stroke.includes('rgba(124, 95, 196') || stroke.includes('124, 95, 196')) {
+                    path.setAttribute('stroke', '#4C1D95'); // Very dark purple
+                  } else if (stroke.includes('rgba(80, 140, 210') || stroke.includes('80, 140, 210')) {
+                    path.setAttribute('stroke', '#1E3A8A'); // Very dark blue
+                  } else if (stroke.includes('rgba') || stroke.includes('rgb')) {
+                    // Convert any rgba/rgb to dark version
+                    const rgbMatch = stroke.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+                    if (rgbMatch) {
+                      const r = Math.max(0, Math.floor(parseInt(rgbMatch[1]) * 0.4));
+                      const g = Math.max(0, Math.floor(parseInt(rgbMatch[2]) * 0.4));
+                      const b = Math.max(0, Math.floor(parseInt(rgbMatch[3]) * 0.4));
+                      path.setAttribute('stroke', `rgb(${r}, ${g}, ${b})`);
+                    } else {
+                      path.setAttribute('stroke', '#000000');
+                    }
+                  } else if (!stroke.startsWith('#') || stroke === '#ffffff' || stroke === '#fff') {
+                    path.setAttribute('stroke', '#000000');
+                  }
+                  // Force thick stroke width
+                  const currentWidth = parseFloat(path.getAttribute('stroke-width') || '0');
+                  path.setAttribute('stroke-width', String(Math.max(5, currentWidth + 2)));
+                } else {
+                  // No stroke? Set a dark one
+                  path.setAttribute('stroke', '#000000');
+                  path.setAttribute('stroke-width', '5');
+                }
+                
+                // Force fill to be dark if it exists
+                if (fill && fill !== 'none' && fill !== 'transparent') {
+                  if (fill.includes('rgba(124, 95, 196') || fill.includes('124, 95, 196')) {
+                    path.setAttribute('fill', '#4C1D95');
+                    path.setAttribute('fill-opacity', '1');
+                  } else if (fill.includes('rgba(80, 140, 210') || fill.includes('80, 140, 210')) {
+                    path.setAttribute('fill', '#1E3A8A');
+                    path.setAttribute('fill-opacity', '1');
+                  } else if (fill.includes('rgba') || fill.includes('rgb')) {
+                    const rgbMatch = fill.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+                    if (rgbMatch) {
+                      const r = Math.max(0, Math.floor(parseInt(rgbMatch[1]) * 0.4));
+                      const g = Math.max(0, Math.floor(parseInt(rgbMatch[2]) * 0.4));
+                      const b = Math.max(0, Math.floor(parseInt(rgbMatch[3]) * 0.4));
+                      path.setAttribute('fill', `rgb(${r}, ${g}, ${b})`);
+                      path.setAttribute('fill-opacity', '0.9');
+                    }
+                  } else if (fill === '#ffffff' || fill === '#fff' || !fill.startsWith('#')) {
+                    path.setAttribute('fill', '#000000');
+                    path.setAttribute('fill-opacity', '1');
+                  }
+                }
+              });
+              
+              // Force ALL rectangles (bars) to be dark
+              const allRects = svgEl.querySelectorAll('rect');
+              allRects.forEach((rectEl: Element) => {
+                const rect = rectEl as SVGRectElement;
+                rect.setAttribute('opacity', '1');
+                const fill = rect.getAttribute('fill');
+                if (fill && fill !== 'none') {
+                  if (fill.includes('rgba(124, 95, 196') || fill.includes('124, 95, 196')) {
+                    rect.setAttribute('fill', '#4C1D95');
+                  } else if (fill.includes('rgba(80, 140, 210') || fill.includes('80, 140, 210')) {
+                    rect.setAttribute('fill', '#1E3A8A');
+                  } else if (fill.includes('rgba') || fill.includes('rgb')) {
+                    const rgbMatch = fill.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+                    if (rgbMatch) {
+                      const r = Math.max(0, Math.floor(parseInt(rgbMatch[1]) * 0.4));
+                      const g = Math.max(0, Math.floor(parseInt(rgbMatch[2]) * 0.4));
+                      const b = Math.max(0, Math.floor(parseInt(rgbMatch[3]) * 0.4));
+                      rect.setAttribute('fill', `rgb(${r}, ${g}, ${b})`);
+                    }
+                  } else if (fill === '#ffffff' || fill === '#fff') {
+                    rect.setAttribute('fill', '#000000');
+                  }
+                  rect.setAttribute('fill-opacity', '1');
+                }
+              });
+              
+              // Force ALL lines (grid, axes) to be dark and visible
+              const allLines = svgEl.querySelectorAll('line');
+              allLines.forEach((lineEl: Element) => {
+                const line = lineEl as SVGLineElement;
+                line.setAttribute('opacity', '1');
+                const stroke = line.getAttribute('stroke');
+                if (stroke && stroke !== 'none') {
+                  if (stroke.includes('rgba') || stroke.includes('rgb')) {
+                    line.setAttribute('stroke', '#666666');
+                  } else if (stroke === '#ffffff' || stroke === '#fff' || !stroke.startsWith('#')) {
+                    line.setAttribute('stroke', '#000000');
+                  }
+                  line.setAttribute('stroke-width', '2');
+                } else {
+                  line.setAttribute('stroke', '#666666');
+                  line.setAttribute('stroke-width', '2');
+                }
+              });
+              
+              // Force ALL text to be black
+              const allText = svgEl.querySelectorAll('text');
+              allText.forEach((textEl: Element) => {
+                const text = textEl as SVGTextElement;
+                text.setAttribute('opacity', '1');
+                // Always set to black regardless of current color
+                text.setAttribute('fill', '#000000');
+                text.setAttribute('stroke', 'none');
+              });
+              
+              // Force ALL circles and other shapes
+              const allCircles = svgEl.querySelectorAll('circle, ellipse, polygon, polyline');
+              allCircles.forEach((shape: Element) => {
+                const el = shape as SVGElement;
+                el.setAttribute('opacity', '1');
+                const fill = el.getAttribute('fill');
+                const stroke = el.getAttribute('stroke');
+                if (fill && fill !== 'none') {
+                  if (fill.includes('rgba') || fill.includes('rgb')) {
+                    const rgbMatch = fill.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+                    if (rgbMatch) {
+                      const r = Math.max(0, Math.floor(parseInt(rgbMatch[1]) * 0.4));
+                      const g = Math.max(0, Math.floor(parseInt(rgbMatch[2]) * 0.4));
+                      const b = Math.max(0, Math.floor(parseInt(rgbMatch[3]) * 0.4));
+                      el.setAttribute('fill', `rgb(${r}, ${g}, ${b})`);
+                    }
+                  } else {
+                    el.setAttribute('fill', '#000000');
+                  }
+                  el.setAttribute('fill-opacity', '1');
+                }
+                if (stroke && stroke !== 'none') {
+                  el.setAttribute('stroke', '#000000');
+                  el.setAttribute('stroke-width', '3');
+                }
+              });
             });
           }
         },
@@ -1062,7 +1353,7 @@ export function ChartsGrid({
         tabIndex={interactive ? 0 : undefined}
       >
         <div className="chart-grid-item-header">
-          <h3>{chartTitles[chartType]}</h3>
+          <h3><span className="chart-icon">{chartIcons[chartType]}</span> {chartTitles[chartType]}</h3>
         </div>
         <div className="chart-grid-item-content">{renderChart(chartType)}</div>
       </div>
@@ -1124,7 +1415,22 @@ export function ChartsGrid({
             </div>
             <div className="chart-insight-modal-body">
               <div className="chart-insight-modal-chart">
-                {renderChart(selectedChart)}
+                <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    {renderChart(selectedChart)}
+                  </div>
+                  {oneLinerLoading ? (
+                    <div className="chart-one-liner" style={{ padding: '12px', textAlign: 'center', width: '100%' }}>
+                      <span style={{ color: 'rgba(255, 255, 255, 0.6)', fontSize: '14px' }}>Generating insight...</span>
+                    </div>
+                  ) : chartOneLiner ? (
+                    <div className="chart-one-liner" style={{ padding: '12px 16px', background: 'rgba(139, 92, 246, 0.15)', borderRadius: '8px', border: '1px solid rgba(139, 92, 246, 0.3)', width: '100%' }}>
+                      <p style={{ margin: 0, fontSize: '15px', color: 'rgba(255, 255, 255, 0.9)', lineHeight: '1.5', fontStyle: 'italic' }}>
+                        {chartOneLiner}
+                      </p>
+                    </div>
+                  ) : null}
+                </div>
               </div>
               <ChartInsightPanel
                 key={selectedChart}

@@ -21,6 +21,16 @@ export interface ScenarioInputs {
   maintenanceRate: number; // e.g., 1.0 (means 1% of home value annually)
   renterInsuranceAnnual: number; // e.g., 240
     
+    // Additional costs
+  closingCostsPercent?: number; // e.g., 3.0 (means 3% of purchase price)
+  pmiRate?: number; // e.g., 0.5 (means 0.5% annual of loan amount)
+  sellingCostsPercent?: number; // e.g., 6.0 (means 6% of sale price)
+    
+    // Tax information
+  federalTaxRate?: number; // e.g., 22 (means 22%)
+  stateTaxRate?: number; // e.g., 5 (means 5%)
+  taxFilingStatus?: 'single' | 'married_joint' | 'married_separate' | 'head_of_household';
+    
     // Growth assumptions
   homeAppreciationRate: number; // e.g., 3.0 (means 3% per year)
   rentGrowthRate: number; // e.g., 3.5 (means 3.5% per year)

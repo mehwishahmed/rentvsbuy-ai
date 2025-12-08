@@ -5,9 +5,10 @@ import type { BreakEvenHeatmapPoint } from '../../types/calculator';
 
 interface BreakEvenHeatmapProps {
   points: BreakEvenHeatmapPoint[];
+  isExport?: boolean;
 }
 
-export function BreakEvenHeatmap({ points }: BreakEvenHeatmapProps) {
+export function BreakEvenHeatmap({ points, isExport }: BreakEvenHeatmapProps) {
   if (!points || points.length === 0) {
     return (
       <div className="chart-container">
@@ -39,6 +40,24 @@ export function BreakEvenHeatmap({ points }: BreakEvenHeatmapProps) {
   };
 
   const getCellStyle = (month: number | null) => {
+    if (isExport) {
+      // Export mode: black and white
+      if (!month || month <= 0) {
+        return { background: '#dddddd', color: '#000000' };
+      }
+      if (maxMonth === 0) {
+        return { background: '#ffffff', color: '#000000' };
+      }
+      const ratio = month / maxMonth; // 0 -> fastest break-even, 1 -> slowest
+      // Use grayscale: lighter for faster, darker for slower
+      const grayValue = Math.round(255 - (ratio * 150)); // 255 (white) to 105 (dark gray)
+      return {
+        background: `rgb(${grayValue}, ${grayValue}, ${grayValue})`,
+        color: grayValue < 180 ? '#ffffff' : '#000000',
+      };
+    }
+    
+    // Normal mode: colorful
     if (!month || month <= 0) {
       return { background: 'rgba(248, 113, 113, 0.25)', color: '#f87171' };
     }

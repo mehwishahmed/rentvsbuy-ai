@@ -77,6 +77,14 @@
   font-weight: 600;
   color: rgba(255, 255, 255, 0.9);
   margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.chart-icon {
+  font-size: 20px;
+  display: inline-block;
 }
 
 .chart-grid-item-content {

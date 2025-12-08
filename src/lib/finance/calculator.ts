@@ -291,9 +291,10 @@ export function calculateNetWorthComparison(inputs: ScenarioInputs): MonthlySnap
     let remainingBalance = loanAmount;
     let rent = inputs.monthlyRent;
     
-    // Upfront costs
-    const closingCostsBuy = inputs.homePrice * 0.03; // 3% closing costs
-    const closingCostsSell = 0.08; // 8% selling costs (applied at end)
+    // Upfront costs - use user-provided values or defaults
+    const closingCostsPercent = inputs.closingCostsPercent ?? 3.0;
+    const closingCostsBuy = inputs.homePrice * (closingCostsPercent / 100);
+    const sellingCostsPercent = inputs.sellingCostsPercent ?? 6.0;
     
     // Day 0: Initial positions
     let buyerCashAccount = -downPaymentAmount - closingCostsBuy; // Buyer spent down payment + closing
@@ -321,9 +322,10 @@ export function calculateNetWorthComparison(inputs: ScenarioInputs): MonthlySnap
       const maintenanceMonthly = (inputs.maintenanceRate / 100 * homeValue) / 12;
       const hoaMonthly = inputs.hoaMonthly;
       
-      // PMI logic (until LTV <= 80%)
+      // PMI logic (until LTV <= 80%) - use user-provided PMI rate or default
       const hasPMI = (remainingBalance / homeValue) > 0.80;
-      const pmiMonthly = hasPMI ? (loanAmount * 0.005) / 12 : 0; // 0.5% PMI rate
+      const pmiRate = inputs.pmiRate ?? 0.5;
+      const pmiMonthly = hasPMI ? (loanAmount * (pmiRate / 100)) / 12 : 0;
       
       const ownerMonthlyCost = 
         interestPaid + 
@@ -337,19 +339,23 @@ export function calculateNetWorthComparison(inputs: ScenarioInputs): MonthlySnap
       const renterMonthlyCost = rent;
       
       // === CASH FLOW DIFFERENCE INVESTING ===
+      // Positive = renting costs more (buyer saves money, can invest the difference)
+      // Negative = owning costs more (renter saves money, can invest the difference)
       const cashFlowDiff = renterMonthlyCost - ownerMonthlyCost;
       
       if (cashFlowDiff > 0) {
-        // Renting is cheaper - renter invests the difference
-        renterPortfolio = (renterPortfolio + cashFlowDiff) * (1 + monthlyInvestmentReturn);
+        // Renting costs more - buyer saves money, invests the difference
+        buyerCashAccount = (buyerCashAccount + cashFlowDiff) * (1 + monthlyInvestmentReturn);
+        renterPortfolio = renterPortfolio * (1 + monthlyInvestmentReturn);
       } else {
-        // Owning is cheaper - buyer keeps the savings
-        buyerCashAccount = (buyerCashAccount + (-cashFlowDiff)) * (1 + monthlyInvestmentReturn);
+        // Owning costs more - renter saves money, invests the difference
+        renterPortfolio = (renterPortfolio + Math.abs(cashFlowDiff)) * (1 + monthlyInvestmentReturn);
+        buyerCashAccount = buyerCashAccount * (1 + monthlyInvestmentReturn);
       }
       
       // === NET WORTH CALCULATION ===
       const isFinalMonth = month === totalMonths;
-      const sellingCosts = isFinalMonth ? homeValue * closingCostsSell : 0;
+      const sellingCosts = isFinalMonth ? homeValue * (sellingCostsPercent / 100) : 0;
       
       const buyerNetWorth = (buyerEquity - sellingCosts) + buyerCashAccount;
       const renterNetWorth = renterPortfolio;

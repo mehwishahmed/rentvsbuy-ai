@@ -19,6 +19,17 @@
   }
 }
 
+.recommendation-intro {
+  font-size: 15px;
+  color: rgba(255, 255, 255, 0.85);
+  line-height: 1.5;
+  margin-bottom: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid rgba(139, 92, 246, 0.2);
+  font-weight: 400;
+  letter-spacing: 0.01em;
+}
+
 .recommendation-header {
   display: flex;
   align-items: center;

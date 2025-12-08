@@ -1,8 +1,10 @@
 """Configuration helpers for the backend service."""
 
+from __future__ import annotations
+
 from functools import lru_cache
 from pathlib import Path
-from typing import List
+from typing import List, Optional
 
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings
@@ -18,7 +20,7 @@ class Settings(BaseSettings):
             "http://127.0.0.1:5174",
         ]
     )
-    openai_api_key: str | None = Field(default=None, alias="OPENAI_API_KEY")
+    openai_api_key: Optional[str] = Field(default=None, alias="OPENAI_API_KEY")
 
     @field_validator("cors_origins", mode="before")
     @classmethod

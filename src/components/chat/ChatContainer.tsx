@@ -1,6 +1,7 @@
 // src/components/chat/ChatContainer.tsx
 
 import { useState, useRef, useEffect, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { ChatMessage } from './ChatMessage';
 import { ChatInput } from './ChatInput';
 import { NetWorthChart } from '../charts/NetWorthChart';
@@ -18,8 +19,6 @@ import { MonteCarloChart } from '../charts/MonteCarloChart';
 import { SensitivityChart } from '../charts/SensitivityChart';
 import { ChartPlaceholder } from '../charts/ChartPlaceholder';
 import { ChartsGrid } from '../charts/ChartsGrid';
-import { BasicInputsCard } from './BasicInputsCard';
-import { AdvancedInputsCard } from './AdvancedInputsCard';
 import { generateRecommendation, type Recommendation } from '../../types/recommendation';
 import { RecommendationCard } from '../RecommendationCard/RecommendationCard';
 import { calculateNetWorthComparison, calculateBuyingCosts, calculateRentingCosts, getTimelineBasedRates, getZIPBasedRates } from '../../lib/finance/calculator';
@@ -48,10 +47,10 @@ import { getAIResponse, createChatCompletion } from '../../lib/ai/openai';
 // import { EquityBuildupChart } from '../charts/EquityBuildupChart';
 // import { RentGrowthChart } from '../charts/RentGrowthChart';
 // import { BreakEvenChart } from '../charts/BreakEvenChart';
-import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import { analyzeScenario, fetchBreakEvenHeatmap, fetchSensitivity, fetchScenarios } from '../../lib/api/finance';
 import { OnboardingTour } from '../onboarding/OnboardingTour';
+import { SummaryTab } from '../summary/SummaryTab';
 // import { CashFlowChart } from '../charts/CashFlowChart';
 // import { CumulativeCostChart } from '../charts/CumulativeCostChart';
 // import { LiquidityTimeline } from '../charts/LiquidityTimeline';
@@ -201,6 +200,7 @@ interface Message {
   recommendation?: Recommendation; // Store recommendation data directly in the message
   recommendationTimeline?: number; // Timeline used for this recommendation
   recommendationLocation?: string; // Location string for this recommendation
+  showActionButtons?: boolean; // Flag to show action buttons (Go to Summary, Go to Charts, Try New Values)
   // Store chart data with the message so it doesn't change when new scenarios are calculated
   snapshotData?: {
     // New unified structure
@@ -252,7 +252,20 @@ type AdvancedInputs = {
   homeInsuranceAnnual: number;
   renterInsuranceAnnual: number;
   hoaMonthly: number;
+  investmentReturnRate?: number;
+  closingCostsPercent?: number;
+  pmiRate?: number;
+  federalTaxRate?: number;
+  stateTaxRate?: number;
+  taxFilingStatus?: 'single' | 'married_joint' | 'married_separate' | 'head_of_household';
 };
+
+// Helper function to generate unique message IDs
+let messageIdCounter = 0;
+function generateMessageId(prefix = ''): string {
+  messageIdCounter++;
+  return `${prefix}${Date.now()}-${messageIdCounter}-${Math.random().toString(36).substr(2, 9)}`;
+}
 
 export function ChatContainer() {
   const [messages, setMessages] = useState<Message[]>([
@@ -278,6 +291,9 @@ const [chartsReady, setChartsReady] = useState(false);
   const [loadingProgress, setLoadingProgress] = useState<{ stage: string; progress: number }>({ stage: 'Starting...', progress: 0 });
   const [isAnalyzing, setIsAnalyzing] = useState(false); // Track if we're doing full analysis vs just AI extraction
   const [saveProgress, setSaveProgress] = useState<number | null>(null); // Track PDF save progress
+  const [showExportChart, setShowExportChart] = useState(false);
+  const [exportChartData, setExportChartData] = useState<{ chartType: ChartType; snapshotData: Message['snapshotData'] } | null>(null);
+  const exportRef = useRef<HTMLDivElement>(null);
   const [isMonteCarloLoading, setIsMonteCarloLoading] = useState(false);
   const [monteCarloProgress, setMonteCarloProgress] = useState(0);
   const [monteCarloProgressStage, setMonteCarloProgressStage] = useState('Starting Monte Carlo simulation...');
@@ -303,6 +319,11 @@ const [chartsReady, setChartsReady] = useState(false);
   // Edit mode state
   const [isEditMode, setIsEditMode] = useState(false);
   const [editableValues, setEditableValues] = useState<UserData | null>(null);
+  const [isLocationEditMode, setIsLocationEditMode] = useState(false);
+  const [editableLocationData, setEditableLocationData] = useState<FormattedLocationData | null>(null);
+  const [showHomePurchaseDetails, setShowHomePurchaseDetails] = useState(false);
+  const [showRentDetails, setShowRentDetails] = useState(false);
+  const [showInvestmentTaxDetails, setShowInvestmentTaxDetails] = useState(false);
   const [advancedInputs, setAdvancedInputs] = useState<AdvancedInputs>({
     loanTermYears: 30,
     interestRate: 7,
@@ -311,19 +332,95 @@ const [chartsReady, setChartsReady] = useState(false);
     homeInsuranceAnnual: 1200,
     renterInsuranceAnnual: 240,
     hoaMonthly: 150,
+    investmentReturnRate: 7,
+    closingCostsPercent: 3,
+    pmiRate: 0.5,
+    federalTaxRate: 22,
+    stateTaxRate: 5,
+    taxFilingStatus: 'single',
   });
   const [editableAdvancedValues, setEditableAdvancedValues] = useState<AdvancedInputs | null>(null);
+  
+  // Track last analysis inputs to detect changes
+  const [lastAnalysisInputs, setLastAnalysisInputs] = useState<{
+    userData: UserData;
+    advancedInputs: AdvancedInputs;
+    locationData: FormattedLocationData | null;
+  } | null>(null);
   
   // Advanced assumptions visibility state
   const [showAdvancedAssumptions, setShowAdvancedAssumptions] = useState(false);
   
   // Advanced charts visibility state
   const [showAdvancedCharts, setShowAdvancedCharts] = useState(false);
-  const [activeTab, setActiveTab] = useState<'chat' | 'charts'>('chat');
+  const [activeTab, setActiveTab] = useState<'chat' | 'charts' | 'summary'>('chat');
   
   // Ref for scrolling to charts
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const monteCarloProgressTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const sensitivityErrorRef = useRef(false);
+  const scenarioOverlayErrorRef = useRef(false);
+  const heatmapErrorRef = useRef(false);
+  const lastPropertyTaxRateRef = useRef<number | null>(null);
+  
+  // Initialize editable values when modals open
+  useEffect(() => {
+    const isAnyModalOpen = showHomePurchaseDetails || showRentDetails || showInvestmentTaxDetails;
+    if (isAnyModalOpen && editableAdvancedValues === null) {
+      setEditableAdvancedValues({ ...advancedInputs });
+    }
+  }, [showHomePurchaseDetails, showRentDetails, showInvestmentTaxDetails]);
+
+  // Save advanced values when modals close
+  useEffect(() => {
+    const isAnyModalOpen = showHomePurchaseDetails || showRentDetails || showInvestmentTaxDetails;
+    if (!isAnyModalOpen && editableAdvancedValues !== null) {
+      setAdvancedInputs(editableAdvancedValues);
+      setEditableAdvancedValues(null);
+    }
+  }, [showHomePurchaseDetails, showRentDetails, showInvestmentTaxDetails]);
+
+  // Handle ESC key to close any advanced details modal
+  useEffect(() => {
+    const handleEscKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (showHomePurchaseDetails) setShowHomePurchaseDetails(false);
+        if (showRentDetails) setShowRentDetails(false);
+        if (showInvestmentTaxDetails) setShowInvestmentTaxDetails(false);
+      }
+    };
+    
+    const isAnyModalOpen = showHomePurchaseDetails || showRentDetails || showInvestmentTaxDetails;
+    if (isAnyModalOpen) {
+      document.addEventListener('keydown', handleEscKey);
+      // Prevent body scroll when modal is open
+      document.body.style.overflow = 'hidden';
+    }
+    
+    return () => {
+      document.removeEventListener('keydown', handleEscKey);
+      document.body.style.overflow = '';
+    };
+  }, [showHomePurchaseDetails, showRentDetails, showInvestmentTaxDetails]);
+  
+  // Memoize advancedInputs key values to prevent unnecessary re-renders
+  const advancedInputsKey = useMemo(() => {
+    return JSON.stringify({
+      propertyTaxRate: advancedInputs.propertyTaxRate,
+      interestRate: advancedInputs.interestRate,
+      loanTermYears: advancedInputs.loanTermYears,
+      homeInsuranceAnnual: advancedInputs.homeInsuranceAnnual,
+      hoaMonthly: advancedInputs.hoaMonthly,
+      maintenanceRate: advancedInputs.maintenanceRate,
+    });
+  }, [
+    advancedInputs.propertyTaxRate,
+    advancedInputs.interestRate,
+    advancedInputs.loanTermYears,
+    advancedInputs.homeInsuranceAnnual,
+    advancedInputs.hoaMonthly,
+    advancedInputs.maintenanceRate,
+  ]);
   
   const [monthlyCosts, setMonthlyCosts] = useState<{
     buying: BuyingCostsBreakdown;
@@ -351,12 +448,26 @@ const [chartsReady, setChartsReady] = useState(false);
   
   useEffect(() => {
     if (locationData && usingZipData) {
-      setAdvancedInputs(prev => ({
-        ...prev,
-        propertyTaxRate: locationData.propertyTaxRate * 100,
-      }));
+      const newTaxRate = locationData.propertyTaxRate * 100;
+      // Only update if the value actually changed to prevent infinite loops
+      if (lastPropertyTaxRateRef.current !== newTaxRate) {
+        lastPropertyTaxRateRef.current = newTaxRate;
+        setAdvancedInputs(prev => {
+          // Only update if value actually changed
+          if (prev.propertyTaxRate === newTaxRate) {
+            return prev;
+          }
+          return {
+            ...prev,
+            propertyTaxRate: newTaxRate,
+          };
+        });
+      }
+    } else {
+      // Reset ref when not using ZIP data
+      lastPropertyTaxRateRef.current = null;
     }
-  }, [locationData, usingZipData]);
+  }, [locationData?.propertyTaxRate, usingZipData]);
 
   useEffect(() => {
     return () => {
@@ -377,10 +488,18 @@ const [chartsReady, setChartsReady] = useState(false);
     if (!inputs) {
       return;
     }
-    loadHeatmapData(inputs).catch(() => {
-      // errors are already logged inside loadHeatmapData
-    });
-  }, [chartsReady, heatmapData, userData, locationData, unifiedAnalysisResult]);
+    console.log('[HEATMAP] 🚀 Loading...');
+    const startTime = Date.now();
+    loadHeatmapData(inputs)
+      .then((data) => {
+        const duration = Date.now() - startTime;
+        console.log('[HEATMAP] ✅ Loaded', { points: data?.length ?? 0, duration: `${(duration / 1000).toFixed(1)}s` });
+      })
+      .catch((error) => {
+        const duration = Date.now() - startTime;
+        console.error('[HEATMAP] ❌ Failed', { error: error?.message || 'Unknown', duration: `${(duration / 1000).toFixed(1)}s` });
+      });
+  }, [chartsReady, heatmapData, userData, locationData, unifiedAnalysisResult, advancedInputs]);
 
   useEffect(() => {
     if (!chartsReady) {
@@ -392,10 +511,15 @@ const [chartsReady, setChartsReady] = useState(false);
     if (chartLoading.type === 'sensitivity') {
       return;
     }
+    if (sensitivityErrorRef.current) {
+      return;
+    }
     const baseInputs = buildScenarioInputs(userData, locationData, unifiedAnalysisResult ?? null, advancedInputs);
     if (!baseInputs) {
       return;
     }
+    console.log('[SENSITIVITY] 🚀 Loading...');
+    const startTime = Date.now();
     setChartLoading({
       type: 'sensitivity',
       progress: 15,
@@ -403,7 +527,10 @@ const [chartsReady, setChartsReady] = useState(false);
     });
     loadSensitivityData(baseInputs, 1.0, 0.1, 0.1)
       .then(result => {
+        const duration = Date.now() - startTime;
+        sensitivityErrorRef.current = false;
         if (result && result.length > 0) {
+          console.log('[SENSITIVITY] ✅ Loaded', { points: result.length, duration: `${(duration / 1000).toFixed(1)}s` });
           setSensitivityData(result);
           setChartLoading({
             type: 'sensitivity',
@@ -414,13 +541,17 @@ const [chartsReady, setChartsReady] = useState(false);
             setChartLoading({ type: null, progress: 0, message: '' });
           }, 300);
         } else {
+          console.warn('[SENSITIVITY] ⚠️ No data');
           setChartLoading({ type: null, progress: 0, message: '' });
         }
       })
-      .catch(() => {
+      .catch((error) => {
+        const duration = Date.now() - startTime;
+        sensitivityErrorRef.current = true;
+        console.error('[SENSITIVITY] ❌ Failed', { error: error?.message || 'Unknown', duration: `${(duration / 1000).toFixed(1)}s` });
         setChartLoading({ type: null, progress: 0, message: '' });
       });
-  }, [chartsReady, sensitivityData, userData, locationData, unifiedAnalysisResult, chartLoading.type]);
+  }, [chartsReady, sensitivityData, userData, locationData, unifiedAnalysisResult, advancedInputsKey]);
 
   useEffect(() => {
     if (!chartsReady) {
@@ -432,6 +563,9 @@ const [chartsReady, setChartsReady] = useState(false);
     if (chartLoading.type === 'scenarioOverlay') {
       return;
     }
+    if (scenarioOverlayErrorRef.current) {
+      return;
+    }
     const baseInputs = buildScenarioInputs(userData, locationData, unifiedAnalysisResult ?? null, advancedInputs);
     if (!baseInputs) {
       return;
@@ -440,6 +574,8 @@ const [chartsReady, setChartsReady] = useState(false);
     if (!variants.length) {
       return;
     }
+    console.log('[SCENARIO OVERLAY] 🚀 Loading...', { variants: variants.length });
+    const startTime = Date.now();
     setChartLoading({
       type: 'scenarioOverlay',
       progress: 15,
@@ -447,7 +583,10 @@ const [chartsReady, setChartsReady] = useState(false);
     });
     loadScenarioOverlayData(variants)
       .then(result => {
+        const duration = Date.now() - startTime;
+        scenarioOverlayErrorRef.current = false;
         if (result && result.length > 0) {
+          console.log('[SCENARIO OVERLAY] ✅ Loaded', { points: result.length, duration: `${(duration / 1000).toFixed(1)}s` });
           setScenarioOverlayData(result);
           setChartLoading({
             type: 'scenarioOverlay',
@@ -462,6 +601,7 @@ const [chartsReady, setChartsReady] = useState(false);
             });
           }, 300);
         } else {
+          console.warn('[SCENARIO OVERLAY] ⚠️ No data');
           setChartLoading({
             type: null,
             progress: 0,
@@ -469,14 +609,17 @@ const [chartsReady, setChartsReady] = useState(false);
           });
         }
       })
-      .catch(() => {
+      .catch((error) => {
+        const duration = Date.now() - startTime;
+        scenarioOverlayErrorRef.current = true;
+        console.error('[SCENARIO OVERLAY] ❌ Failed', { error: error?.message || 'Unknown', duration: `${(duration / 1000).toFixed(1)}s` });
         setChartLoading({
           type: null,
           progress: 0,
           message: ''
         });
       });
-  }, [chartsReady, scenarioOverlayData, userData, locationData, unifiedAnalysisResult, chartLoading.type]);
+  }, [chartsReady, scenarioOverlayData, userData, locationData, unifiedAnalysisResult, advancedInputsKey]);
 
   // Auto-scroll to bottom when messages change or when loading state changes
   useEffect(() => {
@@ -530,8 +673,11 @@ const [chartsReady, setChartsReady] = useState(false);
 
   // Handle save chat as PDF
   const handleSaveChat = async () => {
+    console.log('🚀🚀🚀 [PDF EXPORT] ===== STARTING PDF EXPORT =====');
+    console.log('🚀 [PDF EXPORT] Button clicked, function called');
     try {
       setSaveProgress(0); // Start progress
+      console.log('🚀 [PDF EXPORT] Progress set to 0%, creating PDF document...');
       
       // Create new PDF document
       const pdf = new jsPDF('p', 'mm', 'a4');
@@ -637,63 +783,47 @@ const [chartsReady, setChartsReady] = useState(false);
         // Add message content
         addText(message.content, 11);
         
-        // Add chart if present
-        if (message.chartToShow && message.snapshotData) {
-          const chartNames: Record<ChartType, string> = {
-            netWorth: 'Net Worth Comparison',
-            monthlyCost: 'Monthly Costs Breakdown',
-            totalCost: 'Total Cost Comparison',
-            equity: 'Equity Buildup',
-            rentGrowth: 'Rent Growth Comparison',
-            breakEven: 'Break-Even Timeline',
-            cashFlow: 'Cash Flow Timeline',
-            cumulativeCost: 'Cumulative Cost Comparison',
-            liquidity: 'Liquidity Timeline',
-            taxSavings: 'Tax Savings Timeline',
-            breakEvenHeatmap: 'Break-Even Heatmap',
-            monteCarlo: 'Monte Carlo Simulation',
-            sensitivity: 'Sensitivity Analysis',
-            scenarioOverlay: 'Scenario Overlay'
-          };
+        // Add recommendation card if present
+        if (message.showRecommendation && message.recommendation) {
+          const rec = message.recommendation;
+          const verdictIcon = rec.verdict === 'RENT' ? 'RENT' : 'BUY';
           
-          const chartName = chartNames[message.chartToShow] || message.chartToShow;
-          const inputVals = message.snapshotData.inputValues;
+          yPosition += 3; // Extra space before recommendation
           
-          addText(`Chart: ${chartName}`, 12, true);
+          // Verdict
+          addText(`RECOMMENDATION: ${verdictIcon}`, 14, true);
           
-          if (inputVals) {
-            addText(`Home Price: $${inputVals.homePrice.toLocaleString()} | Monthly Rent: $${inputVals.monthlyRent.toLocaleString()} | Down Payment: ${inputVals.downPaymentPercent}%`, 10);
+          // Savings/Gains
+          const savingsText = rec.verdict === 'RENT' 
+            ? `You'll save $${rec.savings.toLocaleString()} over ${message.recommendationTimeline || 'N/A'} years by renting`
+            : `You'll gain $${rec.savings.toLocaleString()} over ${message.recommendationTimeline || 'N/A'} years by buying`;
+          if (message.recommendationLocation) {
+            addText(`${savingsText} in ${message.recommendationLocation}`, 11);
+          } else {
+            addText(savingsText, 11);
           }
           
-          // Try to capture and add chart image
-          const chartElement = document.querySelector(`[data-message-id="${message.id}"] .chart-wrapper`);
-          if (chartElement) {
-            try {
-              // Small delay to ensure chart is fully rendered
-              await new Promise(resolve => setTimeout(resolve, 100));
-              
-              const canvas = await html2canvas(chartElement as HTMLElement, {
-                backgroundColor: '#ffffff',
-                scale: 2, // Higher quality
-                useCORS: true,
-                allowTaint: true
-              });
-              
-              const imgData = canvas.toDataURL('image/png');
-              const imgWidth = pageWidth - 2 * margin;
-              const imgHeight = (canvas.height * imgWidth) / canvas.width;
-              
-              // Check if we need a new page for the chart
-              checkNewPage(imgHeight + 5);
-              
-              pdf.addImage(imgData, 'PNG', margin, yPosition, imgWidth, imgHeight);
-              yPosition += imgHeight + 5;
-              
-            } catch {
-              addText('[Chart image could not be captured]', 10);
-            }
+          // Monthly difference
+          const monthlyText = rec.monthlyDifference > 0
+            ? `Monthly: Buying costs $${Math.abs(rec.monthlyDifference).toLocaleString()} more`
+            : `Monthly: Renting costs $${Math.abs(rec.monthlyDifference).toLocaleString()} more`;
+          addText(monthlyText, 10);
+          
+          // Break-even
+          if (rec.breakEvenYear) {
+            const breakEvenText = rec.breakEvenYear > (message.recommendationTimeline || 0)
+              ? `Break-even: Year ${rec.breakEvenYear} (you're staying ${message.recommendationTimeline} years)`
+              : `Break-even: Year ${rec.breakEvenYear}`;
+            addText(breakEvenText, 10);
           }
+          
+          // Reasoning
+          addText(`Reasoning: ${rec.reasoning}`, 10);
+          
+          yPosition += 3; // Extra space after recommendation
         }
+        
+        // Skip individual chart exports - we'll capture all charts from Dashboard at the end
         
         yPosition += 2; // Space between messages
       }
@@ -715,6 +845,56 @@ const [chartsReady, setChartsReady] = useState(false);
       alert('Failed to generate PDF. Please try again.');
       setSaveProgress(null); // Hide progress on error
     }
+  };
+
+  // Handle "Try New Values" - reset inputs but keep messages
+  const handleTryNewValues = () => {
+    // Add message FIRST so user sees it immediately (keep all previous messages including old recommendations)
+    const restartMessage: Message = {
+      id: generateMessageId(),
+      role: 'assistant',
+      content: "I've reset your inputs. You can start fresh by providing:\n• a ZIP code (e.g., 92127) to pull local market data, or\n• the home price and rent you want to compare."
+    };
+    setMessages(prev => [...prev, restartMessage]);
+    
+    // Then reset all input values to 0/null but keep all messages
+    setUserData({
+      homePrice: null,
+      monthlyRent: null,
+      downPaymentPercent: null,
+      timeHorizonYears: null
+    });
+    setChartData(null);
+    setChartsReady(false);
+    setMonthlyCosts(null);
+    setTotalCostData(null);
+    setAdvancedMetrics({
+      cashFlow: null,
+      cumulativeCosts: null,
+      liquidityTimeline: null,
+      taxSavings: null
+    });
+    setHeatmapData(null);
+    setMonteCarloData(null);
+    setSensitivityData(null);
+    setScenarioOverlayData(null);
+    setUnifiedAnalysisResult(null);
+    setLocationData(null);
+    setCurrentZipCode(null);
+    setIsLocationLocked(false);
+    setUsingZipData(false);
+    setHasShownScenarioSummary(false);
+    setEditableValues(null);
+    setEditableAdvancedValues(null);
+    setAdvancedInputs({
+      loanTermYears: 30,
+      interestRate: 7,
+      propertyTaxRate: 1,
+      maintenanceRate: 1,
+      homeInsuranceAnnual: 1200,
+      renterInsuranceAnnual: 240,
+      hoaMonthly: 150,
+    });
   };
 
   // Handle restart/reset
@@ -754,7 +934,6 @@ const [chartsReady, setChartsReady] = useState(false);
     setUsingZipData(false);
     setIsEditMode(false);
     setEditableValues(null);
-    setIsReferenceBoxVisible(true);
     setHasShownScenarioSummary(false); // Reset scenario summary flag
     setRecommendation(null);
   };
@@ -799,7 +978,7 @@ const [chartsReady, setChartsReady] = useState(false);
       setEditableValues(null);
       setEditableAdvancedValues(null);
       const noChangeMessage: Message = {
-        id: Date.now().toString(),
+        id: generateMessageId(),
         role: 'assistant',
         content: "No changes were made to your scenario. Everything remains the same!"
       };
@@ -820,7 +999,7 @@ const [chartsReady, setChartsReady] = useState(false);
 
     // Add AI message acknowledging the change
     const changeMessage: Message = {
-      id: Date.now().toString(),
+      id: generateMessageId(),
       role: 'assistant',
       content: `Perfect! I've updated your scenario with the new values. The charts have been recalculated to reflect your changes. Check out the chart buttons above to explore different views!${fallbackNotice}`
     };
@@ -849,7 +1028,7 @@ const [chartsReady, setChartsReady] = useState(false);
   const handleShowDetails = () => {
     // Add Net Worth chart message
     const chartMessage: Message = {
-      id: Date.now().toString(),
+      id: generateMessageId(),
       role: 'assistant',
       content: "Here's your net worth comparison over time. The higher line shows which option leaves you with more money.",
       chartToShow: 'netWorth',
@@ -908,10 +1087,149 @@ const [chartsReady, setChartsReady] = useState(false);
     });
   };
 
-  const handleAdvancedFieldChange = (field: keyof AdvancedInputs, value: number) => {
+  const handleAdvancedFieldChange = (field: keyof AdvancedInputs, value: number | string) => {
+    const updatedValue = value as any;
     setEditableAdvancedValues(prev => {
-      const next = prev ? { ...prev } : { ...advancedInputs };
-      next[field] = value;
+      const base = prev ?? advancedInputs;
+      return {
+        ...base,
+        [field]: updatedValue
+      };
+    });
+    // Update advancedInputs immediately so calculations use new values
+    setAdvancedInputs(prev => ({
+      ...prev,
+      [field]: updatedValue
+    }));
+  };
+
+  // Helper to get current value (editable or original)
+  const getAdvancedValue = (field: keyof AdvancedInputs): number | string => {
+    const editable = editableAdvancedValues ?? advancedInputs;
+    return editable[field] ?? (advancedInputs[field] as any) ?? 0;
+  };
+
+  // Check if inputs have changed since last analysis
+  const hasInputsChanged = (): boolean => {
+    if (!lastAnalysisInputs || !unifiedAnalysisResult) return false;
+    
+    // Compare user data
+    const userDataChanged = 
+      userData.homePrice !== lastAnalysisInputs.userData.homePrice ||
+      userData.monthlyRent !== lastAnalysisInputs.userData.monthlyRent ||
+      userData.downPaymentPercent !== lastAnalysisInputs.userData.downPaymentPercent ||
+      userData.timeHorizonYears !== lastAnalysisInputs.userData.timeHorizonYears;
+    
+    // Compare advanced inputs
+    const advancedChanged = 
+      JSON.stringify(advancedInputs) !== JSON.stringify(lastAnalysisInputs.advancedInputs);
+    
+    // Compare location data (especially medianHomePrice and averageRent which affect calculations)
+    const locationChanged = 
+      locationData?.medianHomePrice !== lastAnalysisInputs.locationData?.medianHomePrice ||
+      locationData?.averageRent !== lastAnalysisInputs.locationData?.averageRent ||
+      locationData?.propertyTaxRate !== lastAnalysisInputs.locationData?.propertyTaxRate ||
+      locationData?.homeAppreciationRate !== lastAnalysisInputs.locationData?.homeAppreciationRate ||
+      locationData?.rentGrowthRate !== lastAnalysisInputs.locationData?.rentGrowthRate;
+    
+    return userDataChanged || advancedChanged || locationChanged;
+  };
+
+  // Handle recalculate button click
+  const handleRecalculate = async () => {
+    if (!userData.homePrice || !userData.monthlyRent || !userData.downPaymentPercent || !userData.timeHorizonYears) {
+      return; // Can't recalculate without required inputs
+    }
+
+    setIsAnalyzing(true);
+    setLoadingProgress({ stage: 'Analyzing...', progress: 0 });
+
+    try {
+      const inputs = buildScenarioInputs(userData, locationData, unifiedAnalysisResult ?? null, advancedInputs);
+      const { analysis, unifiedAnalysis } = await runAnalysis(inputs, currentZipCode);
+      
+      setLoadingProgress({ stage: 'Complete!', progress: 100 });
+      setIsAnalyzing(false);
+      
+      setUnifiedAnalysisResult(unifiedAnalysis ?? null);
+      
+      // Update last analysis inputs snapshot
+      setLastAnalysisInputs({
+        userData: { ...userData },
+        advancedInputs: { ...advancedInputs },
+        locationData: locationData ? { ...locationData } : null,
+      });
+
+      applyAnalysis(analysis);
+
+      // Generate and show new recommendation
+      if (unifiedAnalysis && userData.timeHorizonYears) {
+        const recommendation = generateRecommendation(unifiedAnalysis, userData.timeHorizonYears);
+        
+        const recommendationMessage: Message = {
+          id: generateMessageId('recommendation-'),
+          role: 'assistant',
+          content: '',
+          showRecommendation: true,
+          recommendation: recommendation,
+          recommendationTimeline: userData.timeHorizonYears,
+          recommendationLocation: locationData ? `${locationData.city}, ${locationData.state}` : undefined
+        };
+        setMessages(prev => [...prev, recommendationMessage]);
+      }
+    } catch (error) {
+      console.error('Recalculation error:', error);
+      setIsAnalyzing(false);
+      setLoadingProgress({ stage: '', progress: 0 });
+    }
+  };
+
+  // Location data edit handlers
+  const handleEditLocation = () => {
+    setIsLocationEditMode(true);
+    if (locationData) {
+      setEditableLocationData({ ...locationData });
+    }
+  };
+
+  const handleCancelLocationEdit = () => {
+    setIsLocationEditMode(false);
+    setEditableLocationData(null);
+  };
+
+  const handleSaveLocationEdit = () => {
+    if (editableLocationData) {
+      setLocationData(editableLocationData);
+      
+      // If user is using location data (ZIP-based), update userData.homePrice when medianHomePrice changes
+      // This ensures the calculation uses the updated home price
+      if (usingZipData && editableLocationData.medianHomePrice !== locationData?.medianHomePrice) {
+        setUserData(prev => ({
+          ...prev,
+          homePrice: editableLocationData.medianHomePrice
+        }));
+      }
+      
+      // Also update monthlyRent if averageRent changed and user is using location data
+      if (usingZipData && editableLocationData.averageRent !== null && 
+          editableLocationData.averageRent !== locationData?.averageRent) {
+        setUserData(prev => ({
+          ...prev,
+          monthlyRent: editableLocationData.averageRent
+        }));
+      }
+      
+      setIsLocationEditMode(false);
+      setEditableLocationData(null);
+      // Trigger recalculation if needed
+    }
+  };
+
+  const handleLocationFieldChange = (field: keyof FormattedLocationData, value: number | string | null) => {
+    setEditableLocationData(prev => {
+      if (!prev) return null;
+      const next = { ...prev };
+      (next as any)[field] = value;
       return next;
     });
   };
@@ -1046,11 +1364,11 @@ function shouldShowChart(aiResponse: string): ChartType | null {
         setUserData({ homePrice: null, monthlyRent: null, downPaymentPercent: null, timeHorizonYears: null });
         
         const changeMessage: Message = {
-          id: Date.now().toString(),
+          id: generateMessageId(),
           role: 'assistant',
           content: "No problem! Let's go with your own numbers instead. What home price and monthly rent are you working with?"
         };
-        setMessages(prev => [...prev, { id: Date.now().toString(), role: 'user', content }, changeMessage]);
+        setMessages(prev => [...prev, { id: generateMessageId(), role: 'user', content }, changeMessage]);
         return;
       }
       
@@ -1066,65 +1384,65 @@ function shouldShowChart(aiResponse: string): ChartType | null {
         });
         
         const changeMessage: Message = {
-          id: Date.now().toString(),
+          id: generateMessageId(),
           role: 'assistant',
           content: `Sure thing! I'll use the ${locationData.city}, ${locationData.state} data. Just need your down payment percentage.`
         };
-        setMessages(prev => [...prev, { id: Date.now().toString(), role: 'user', content }, changeMessage]);
+        setMessages(prev => [...prev, { id: generateMessageId(), role: 'user', content }, changeMessage]);
         return;
       }
     }
     
-  const trimmedContent = content.trim();
-  const zipOnlyMatch = trimmedContent.match(/^(?:zip\s*)?(\d{5})$/i);
-  if (zipOnlyMatch) {
-    const zipCodeOnly = zipOnlyMatch[1];
-    const userMessage: Message = {
-      id: Date.now().toString(),
-      role: 'user',
-      content,
-    };
-    setMessages((prev) => [...prev, userMessage]);
-
-    const rawLocation = getLocationData(zipCodeOnly);
-    if (!rawLocation) {
-      const invalidZipMessage: Message = {
-        id: Date.now().toString(),
-        role: 'assistant',
-        content: `I couldn't find market data for ZIP code ${zipCodeOnly}. Could you double-check it or share a nearby ZIP?`,
+    const trimmedContent = content.trim();
+    const zipOnlyMatch = trimmedContent.match(/^(?:zip\s*)?(\d{5})$/i);
+    if (zipOnlyMatch) {
+      const zipCodeOnly = zipOnlyMatch[1];
+      const userMessage: Message = {
+        id: generateMessageId(),
+        role: 'user',
+        content,
       };
-      setMessages((prev) => [...prev, invalidZipMessage]);
+      setMessages((prev) => [...prev, userMessage]);
+
+      const rawLocation = getLocationData(zipCodeOnly);
+      if (!rawLocation) {
+        const invalidZipMessage: Message = {
+          id: generateMessageId(),
+          role: 'assistant',
+          content: `I couldn't find market data for ZIP code ${zipCodeOnly}. Could you double-check it or share a nearby ZIP?`,
+        };
+        setMessages((prev) => [...prev, invalidZipMessage]);
+        setIsLoading(false);
+        setIsAnalyzing(false);
+        return;
+      }
+
+      const formattedLocation = formatLocationData(rawLocation);
+      const summaryText = applyLocalMarketAutoFill(zipCodeOnly, formattedLocation);
+      const assistantMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        role: 'assistant',
+        content: summaryText,
+      };
+      setMessages((prev) => [...prev, assistantMessage]);
       setIsLoading(false);
       setIsAnalyzing(false);
       return;
     }
 
-    const formattedLocation = formatLocationData(rawLocation);
-    const summaryText = applyLocalMarketAutoFill(zipCodeOnly, formattedLocation);
-    const assistantMessage: Message = {
-      id: (Date.now() + 1).toString(),
-      role: 'assistant',
-      content: summaryText,
+    // Add user message
+    const userMessage: Message = {
+      id: generateMessageId(),
+      role: 'user',
+      content,
     };
-    setMessages((prev) => [...prev, assistantMessage]);
-    setIsLoading(false);
-    setIsAnalyzing(false);
-    return;
-  }
-
-  // Add user message
-  const userMessage: Message = {
-    id: Date.now().toString(),
-    role: 'user',
-    content,
-  };
-    
-  setMessages(prev => [...prev, userMessage]);
+      
+    setMessages(prev => [...prev, userMessage]);
     setIsLoading(true);
     
     try {
-    // Extract data from message using AI
-    const extractionResult = onlyAssumptions
+      // Extract data from message using AI
+      const extractionResult = onlyAssumptions
       ? {
           userData: {
             ...userData,
@@ -1141,41 +1459,41 @@ function shouldShowChart(aiResponse: string): ChartType | null {
         }
       : await extractUserDataWithAI(normalizedContent, userData);
 
-    const { userData: newUserData, locationData: detectedLocationData } = extractionResult;
-    
-    // Debug logging
-    
-    // Check if user mentioned a ZIP code but it wasn't found
-    const zipCode = detectZipCode(content);
-    if (zipCode && !detectedLocationData) {
-      // Invalid/not found ZIP code
-      const invalidZipMessage: Message = {
-        id: Date.now().toString(),
-      role: 'assistant',
-        content: `I couldn't find data for ZIP code ${zipCode}. If you'd like, we can continue with your own numbers using standard assumptions (1.0% property tax, 3.5% rent growth). What home price and monthly rent are you working with?`
-      };
+      const { userData: newUserData, locationData: detectedLocationData } = extractionResult;
+      
+      // Debug logging
+      
+      // Check if user mentioned a ZIP code but it wasn't found
+      const zipCode = detectZipCode(content);
+      if (zipCode && !detectedLocationData) {
+        // Invalid/not found ZIP code
+        const invalidZipMessage: Message = {
+          id: generateMessageId(),
+          role: 'assistant',
+          content: `I couldn't find data for ZIP code ${zipCode}. If you'd like, we can continue with your own numbers using standard assumptions (1.0% property tax, 3.5% rent growth). What home price and monthly rent are you working with?`
+        };
       setMessages(prev => [...prev, invalidZipMessage]);
       setIsLoading(false);
       return;
-    }
-    
-    // Check if user mentioned a city but no ZIP code was provided
-    const cityMention = detectCityMention(content);
-    if (cityMention && !zipCode && !detectedLocationData) {
+      }
+      
+      // Check if user mentioned a city but no ZIP code was provided
+      const cityMention = detectCityMention(content);
+      if (cityMention && !zipCode && !detectedLocationData) {
       // User mentioned a city but didn't provide a ZIP code
       const cityName = cityMention.city || 'that area';
       const cityMessage: Message = {
-        id: Date.now().toString(),
+        id: generateMessageId(),
         role: 'assistant',
         content: `I'd love to help you analyze ${cityName}! To get accurate local market data (property taxes, home appreciation rates, and rent growth), I'll need a ZIP code for that area. Could you provide a ZIP code? For example, if you're looking in Los Angeles, you might use 90035 or 90210.`
       };
       setMessages(prev => [...prev, cityMessage]);
       setIsLoading(false);
       return;
-    }
-    
-    // Handle location data if detected
-    if (detectedLocationData) {
+      }
+      
+      // Handle location data if detected
+      if (detectedLocationData) {
       setLocationData(detectedLocationData);
       setCurrentZipCode(zipCode); // Store ZIP code for ML predictions
       
@@ -1210,7 +1528,7 @@ function shouldShowChart(aiResponse: string): ChartType | null {
         }
         
         const newFlowMessage: Message = {
-          id: Date.now().toString(),
+          id: generateMessageId(),
       role: 'assistant',
           content: `Perfect! I'll use your $${newUserData.homePrice?.toLocaleString()} home price with the ${detectedLocationData.city}, ${detectedLocationData.state} market data for property taxes and growth rates. What's your current monthly rent, down payment percentage, and how long do you plan to stay in this home?`
         };
@@ -1229,7 +1547,7 @@ function shouldShowChart(aiResponse: string): ChartType | null {
         setUsingZipData(true);
         
         const newFlowMessage: Message = {
-          id: Date.now().toString(),
+          id: generateMessageId(),
           role: 'assistant',
           content: `Perfect! I'll use your $${newUserData.monthlyRent?.toLocaleString()}/month rent with the ${detectedLocationData.city}, ${detectedLocationData.state} market data for property taxes and growth rates. What home price are you considering, down payment percentage, and how long do you plan to stay in this home?`
         };
@@ -1240,48 +1558,41 @@ function shouldShowChart(aiResponse: string): ChartType | null {
       
       const summaryText = applyLocalMarketAutoFill(zipCode ?? null, detectedLocationData);
       const autoFillMessage: Message = {
-        id: Date.now().toString(),
+        id: generateMessageId(),
         role: 'assistant',
         content: summaryText
       };
       setMessages(prev => [...prev, autoFillMessage]);
       setIsLoading(false);
       return;
-    }
-    
-    // If we get here, no ZIP was detected or user provided custom values
-    setUserData(newUserData);
-    
-    // Check if we have all data and if it changed
-    const hasAllData = newUserData.homePrice && newUserData.monthlyRent && newUserData.downPaymentPercent && newUserData.timeHorizonYears;
-    const dataChanged = 
+      }
+      
+      // If we get here, no ZIP was detected or user provided custom values
+      setUserData(newUserData);
+      
+      // Check if we have all data and if it changed
+      const hasAllData = newUserData.homePrice && newUserData.monthlyRent && newUserData.downPaymentPercent && newUserData.timeHorizonYears;
+      const dataChanged = 
       newUserData.homePrice !== userData.homePrice ||
       newUserData.monthlyRent !== userData.monthlyRent ||
       newUserData.downPaymentPercent !== userData.downPaymentPercent ||
       newUserData.timeHorizonYears !== userData.timeHorizonYears;
-    
-    // If data changed, we need to recalculate charts BEFORE showing them
-    let freshChartData = chartData;
-    let freshMonthlyCosts = monthlyCosts;
-    let freshTotalCostData = totalCostData;
-    let analysisInputs: ScenarioInputs | null = null;
-    let analysisResult: CalculatorOutput | null = null;
-    // unifiedAnalysisResult is now a state variable, so we update it instead of creating a local one
-    let analysisSource: 'backend' | 'local' | null = null;
-    let analysisApplied = false;
+      
+      // If data changed, we need to recalculate charts BEFORE showing them
+      let freshChartData = chartData;
+      let freshMonthlyCosts = monthlyCosts;
+      let freshTotalCostData = totalCostData;
+      let analysisInputs: ScenarioInputs | null = null;
+      let analysisResult: CalculatorOutput | null = null;
+      // unifiedAnalysisResult is now a state variable, so we update it instead of creating a local one
+      let analysisSource: 'backend' | 'local' | null = null;
+      let analysisApplied = false;
 
-    if (hasAllData && dataChanged) {
+      if (hasAllData && dataChanged) {
       setHeatmapData(null);
       setIsAnalyzing(true); // Mark that we're doing full analysis
       setLoadingProgress({ stage: 'Starting analysis...', progress: 0 }); // Reset progress
       
-      // Show a message that this may take a moment
-      const processingMessage: Message = {
-        id: Date.now().toString(),
-        role: 'assistant',
-        content: "Perfect! I'm calculating your analysis. This may take a minute while I crunch every month for the next " + newUserData.timeHorizonYears + " years using the local appreciation, rent growth, and cost assumptions. Thanks for your patience!"
-      };
-      setMessages(prev => [...prev, processingMessage]);
       const inputs = buildScenarioInputs(newUserData, locationData, unifiedAnalysisResult, advancedInputs);
 
       if (inputs) {
@@ -1291,28 +1602,22 @@ function shouldShowChart(aiResponse: string): ChartType | null {
         setLoadingProgress({ stage: 'Complete!', progress: 100 }); // Set to complete
         setIsAnalyzing(false); // Done with analysis
         analysisResult = analysis;
+        
+        console.log('[DEBUG] Analysis completed:', {
+          hasAnalysis: !!analysis,
+          hasUnifiedAnalysis: !!unifiedAnalysis,
+          unifiedAnalysisKeys: unifiedAnalysis ? Object.keys(unifiedAnalysis) : null,
+          timelineLength: unifiedAnalysis?.timeline?.length ?? 0
+        });
+        
         setUnifiedAnalysisResult(unifiedAnalysis ?? null);
         
-        // Generate and show recommendation
-        if (unifiedAnalysis && newUserData.timeHorizonYears) {
-          const recommendation = generateRecommendation(unifiedAnalysis, newUserData.timeHorizonYears);
-          
-          // Add recommendation card as a special message in the chat flow
-          // Store the recommendation data directly in the message so it persists
-          // This will appear right after the analysis completes
-          const recommendationMessage: Message = {
-            id: `recommendation-${Date.now()}`,
-            role: 'assistant',
-            content: '', // Empty content, we'll render the card instead
-            showRecommendation: true,
-            recommendation: recommendation,
-            recommendationTimeline: newUserData.timeHorizonYears,
-            recommendationLocation: locationData ? `${locationData.city}, ${locationData.state}` : undefined
-          };
-          setMessages(prev => [...prev, recommendationMessage]);
-        }
-        
-        // Verify it was set correctly
+        // Store snapshot of inputs used for this analysis
+        setLastAnalysisInputs({
+          userData: { ...newUserData },
+          advancedInputs: { ...advancedInputs },
+          locationData: locationData ? { ...locationData } : null,
+        });
         
         analysisSource = source;
         analysisApplied = true;
@@ -1325,12 +1630,32 @@ function shouldShowChart(aiResponse: string): ChartType | null {
         freshTotalCostData = analysis.totals;
 
         applyAnalysis(analysis);
+        console.log('[DEBUG] applyAnalysis called, chartsReady should be true now');
 
-        // Skip scenario summary if we're showing a recommendation (recommendation card already has the key info)
-        const willShowRecommendation = unifiedAnalysis && newUserData.timeHorizonYears;
-        
-        // Add scenario summary message (only once per scenario, and only if no recommendation)
-        if (!hasShownScenarioSummary && !willShowRecommendation && newUserData.homePrice && newUserData.monthlyRent && newUserData.downPaymentPercent && newUserData.timeHorizonYears) {
+        // Generate and show recommendation
+        if (unifiedAnalysis && newUserData.timeHorizonYears) {
+          const recommendation = generateRecommendation(unifiedAnalysis, newUserData.timeHorizonYears);
+          console.log('[RECOMMENDATION] ✅ Generated', { verdict: recommendation.verdict, timeHorizon: newUserData.timeHorizonYears });
+          
+          const recommendationMessage: Message = {
+            id: generateMessageId('recommendation-'),
+            role: 'assistant',
+            content: '',
+            showRecommendation: true,
+            recommendation: recommendation,
+            recommendationTimeline: newUserData.timeHorizonYears,
+            recommendationLocation: locationData ? `${locationData.city}, ${locationData.state}` : undefined
+          };
+          setMessages(prev => {
+            // Allow multiple recommendation cards - just add the new one
+            console.log('[RECOMMENDATION] ✅ Added to messages');
+            return [...prev, recommendationMessage];
+          });
+          setHasShownScenarioSummary(true);
+        } else {
+          console.log('[DEBUG] Not showing recommendation card - showing scenario summary instead');
+          // Add scenario summary message (only once per scenario, and only if no recommendation)
+          if (!hasShownScenarioSummary && newUserData.homePrice && newUserData.monthlyRent && newUserData.downPaymentPercent && newUserData.timeHorizonYears) {
           const locationText = locationData 
             ? ` in ${locationData.city}, ${locationData.state}`
             : '';
@@ -1360,27 +1685,6 @@ function shouldShowChart(aiResponse: string): ChartType | null {
           setMessages(prev => [...prev, summaryMessage]);
           setHasShownScenarioSummary(true);
         }
-        
-        // Add recommendation card message if we have recommendation (skip scenario summary in this case)
-        if (willShowRecommendation) {
-          setTimeout(() => {
-            if (recommendation && unifiedAnalysis && newUserData.timeHorizonYears) {
-              const recommendationMessage: Message = {
-                id: `recommendation-${Date.now()}`,
-                role: 'assistant',
-                content: '', // Empty content, we'll render the card instead
-                showRecommendation: true
-              };
-              setMessages(prev => {
-                // Only add if not already present
-                if (prev.some(m => m.showRecommendation)) {
-                  return prev;
-                }
-                return [...prev, recommendationMessage];
-              });
-            }
-          }, 100);
-          setHasShownScenarioSummary(true); // Mark as shown so we don't show scenario summary later
         }
       }
     }
@@ -1401,12 +1705,31 @@ function shouldShowChart(aiResponse: string): ChartType | null {
         };
         freshTotalCostData = calcResult.analysis.totals;
 
-        // Skip scenario summary if we're showing a recommendation (recommendation card already has the key info)
+        // Generate and show recommendation
         const unifiedAnalysis = calcResult.unifiedAnalysis ?? unifiedAnalysisResult;
-        const willShowRecommendation = unifiedAnalysis && newUserData.timeHorizonYears;
+        if (unifiedAnalysis && newUserData.timeHorizonYears) {
+          const recommendation = generateRecommendation(unifiedAnalysis, newUserData.timeHorizonYears);
+          console.log('[RECOMMENDATION] ✅ Generated (local calc)', { verdict: recommendation.verdict, timeHorizon: newUserData.timeHorizonYears });
+          
+          const recommendationMessage: Message = {
+            id: generateMessageId('recommendation-'),
+            role: 'assistant',
+            content: '',
+            showRecommendation: true,
+            recommendation: recommendation,
+            recommendationTimeline: newUserData.timeHorizonYears,
+            recommendationLocation: locationData ? `${locationData.city}, ${locationData.state}` : undefined
+          };
+          setMessages(prev => {
+            // Allow multiple recommendation cards - just add the new one
+            console.log('[RECOMMENDATION] ✅ Added to messages (local calc)');
+            return [...prev, recommendationMessage];
+          });
+          setHasShownScenarioSummary(true);
+        }
         
         // Add scenario summary message BEFORE any chart messages (only once per scenario, and only if no recommendation)
-        if (!hasShownScenarioSummary && !willShowRecommendation && newUserData.homePrice && newUserData.monthlyRent && newUserData.downPaymentPercent && newUserData.timeHorizonYears) {
+        if (!hasShownScenarioSummary && !(unifiedAnalysis && newUserData.timeHorizonYears) && newUserData.homePrice && newUserData.monthlyRent && newUserData.downPaymentPercent && newUserData.timeHorizonYears) {
           const locationText = locationData 
             ? ` in ${locationData.city}, ${locationData.state}`
             : '';
@@ -1436,35 +1759,13 @@ function shouldShowChart(aiResponse: string): ChartType | null {
           setMessages(prev => [...prev, summaryMessage]);
           setHasShownScenarioSummary(true);
         }
-        
-        // Add recommendation card message if we have recommendation (skip scenario summary in this case)
-        if (willShowRecommendation) {
-          setTimeout(() => {
-            if (recommendation && unifiedAnalysis && newUserData.timeHorizonYears) {
-              const recommendationMessage: Message = {
-                id: `recommendation-${Date.now()}`,
-                role: 'assistant',
-                content: '', // Empty content, we'll render the card instead
-                showRecommendation: true
-              };
-              setMessages(prev => {
-                // Only add if not already present
-                if (prev.some(m => m.showRecommendation)) {
-                  return prev;
-                }
-                return [...prev, recommendationMessage];
-              });
-            }
-          }, 100);
-          setHasShownScenarioSummary(true); // Mark as shown so we don't show scenario summary later
-        }
       }
-    }
+      }
 
-    // Check if user is asking for a chart and we already have analysis data
-    // If so, skip the slow AI call and go straight to chart detection
-    const contentLower = content.toLowerCase();
-    const isChartRequest = hasAllData && analysisResult && (
+      // Check if user is asking for a chart and we already have analysis data
+      // If so, skip the slow AI call and go straight to chart detection
+      const contentLower = content.toLowerCase();
+      const isChartRequest = hasAllData && analysisResult && (
       contentLower.includes('show') || 
       contentLower.includes('chart') || 
       contentLower.includes('graph') ||
@@ -1477,35 +1778,40 @@ function shouldShowChart(aiResponse: string): ChartType | null {
       contentLower.includes('monte carlo') ||
       contentLower.includes('sensitivity') ||
       contentLower.includes('heatmap')
-    );
-    
-    // Get AI response (skip if it's just a chart request and we have data)
-    const allMessages = [...messages, userMessage].map(m => ({
+      );
+      
+      // Get AI response (skip if we just completed analysis or it's a chart request)
+      const allMessages = [...messages, userMessage].map(m => ({
       role: m.role,
       content: m.content
-    }));
-    
-    let botResponse: string;
-    if (isChartRequest) {
-      // For chart requests, use a fast fallback response instead of waiting for AI
-      botResponse = "Sure! Let me show you that chart.";
-    } else {
-      try {
-        botResponse = await getAIResponse(allMessages, newUserData);
-      } catch (error) {
-        console.error('AI response failed, using fallback:', error);
-        // Fallback response if AI fails
-        if (hasAllData && analysisResult) {
-          botResponse = "Perfect! I've calculated your analysis. Want to see how your wealth builds up over time? I can show you your Net Worth Comparison!";
-        } else {
-          botResponse = "Got it! I'm processing your information. What else would you like to know?";
+      }));
+      
+      let botResponse: string;
+      
+      // Skip AI call if we just completed analysis - show quick response instead
+      if (analysisApplied && hasAllData && analysisResult) {
+        // Analysis just completed - use fast response, no need to wait for AI
+        botResponse = "The recommendation card above gives you the gist. For a better summary, check out the Summary tab. You can also go to the Charts Dashboard tab for a more in-depth chart analysis.";
+      } else if (isChartRequest) {
+        // For chart requests, use a fast fallback response instead of waiting for AI
+        botResponse = "Sure! Let me show you that chart.";
+      } else {
+        try {
+          botResponse = await getAIResponse(allMessages, newUserData);
+        } catch (error) {
+          console.error('AI response failed, using fallback:', error);
+          // Fallback response if AI fails
+          if (hasAllData && analysisResult) {
+            botResponse = "Perfect! I've calculated your analysis. Want to see how your wealth builds up over time? I can show you your Net Worth Comparison!";
+          } else {
+            botResponse = "Got it! I'm processing your information. What else would you like to know?";
+          }
         }
       }
-    }
 
-    // Check if user directly requested a chart (faster than waiting for AI)
-    let chartToShow: ChartType | null = null;
-    if (isChartRequest && hasAllData && analysisResult) {
+      // Check if user directly requested a chart (faster than waiting for AI)
+      let chartToShow: ChartType | null = null;
+      if (isChartRequest && hasAllData && analysisResult) {
       // Direct chart detection from user input
       if (contentLower.includes('net worth')) chartToShow = 'netWorth';
       else if (contentLower.includes('monthly cost')) chartToShow = 'monthlyCost';
@@ -1521,17 +1827,17 @@ function shouldShowChart(aiResponse: string): ChartType | null {
       else if (contentLower.includes('monte carlo')) chartToShow = 'monteCarlo';
       else if (contentLower.includes('sensitivity')) chartToShow = 'sensitivity';
       else if (contentLower.includes('scenario')) chartToShow = 'scenarioOverlay';
-    }
-    
-    // If no direct match, check AI response
-    if (!chartToShow) {
+      }
+      
+      // If no direct match, check AI response
+      if (!chartToShow) {
       chartToShow = shouldShowChart(botResponse);
-    }
-    let heatmapPointsResult: BreakEvenHeatmapPoint[] | null = null;
-    let sensitivityResult: SensitivityResult[] | null = null;
-    let scenarioOverlayResult: ScenarioResult[] | null = null;
-    
-    if (chartToShow === 'breakEvenHeatmap') {
+      }
+      let heatmapPointsResult: BreakEvenHeatmapPoint[] | null = null;
+      let sensitivityResult: SensitivityResult[] | null = null;
+      let scenarioOverlayResult: ScenarioResult[] | null = null;
+      
+      if (chartToShow === 'breakEvenHeatmap') {
       // Always build fresh inputs from current user data to ensure heatmap uses latest values
       setHeatmapData(null); // Clear old cached data
       const baseInputs = buildScenarioInputs(newUserData, locationData, unifiedAnalysisResult, advancedInputs);
@@ -1563,9 +1869,9 @@ function shouldShowChart(aiResponse: string): ChartType | null {
           console.error('Failed to load heatmap data:', error);
         }
       }
-    }
-    
-    if (chartToShow === 'monteCarlo') {
+      }
+      
+      if (chartToShow === 'monteCarlo') {
       // Load Monte Carlo simulation data using unified analysis endpoint
       // This ensures we get the new HomePricePathSummary format
       const baseInputs = buildScenarioInputs(newUserData, locationData, unifiedAnalysisResult, advancedInputs);
@@ -1656,9 +1962,9 @@ function shouldShowChart(aiResponse: string): ChartType | null {
           setTimeout(() => setChartLoading({ type: null, progress: 0, message: '' }), 5000);
         }
       }
-    }
-    
-    if (chartToShow === 'sensitivity') {
+      }
+      
+      if (chartToShow === 'sensitivity') {
       // Load sensitivity analysis data (default deltas: ±1% interest, ±10% price, ±10% rent)
       setSensitivityData(null); // Clear old cached data
       const baseInputs = buildScenarioInputs(newUserData, locationData, unifiedAnalysisResult, advancedInputs);
@@ -1690,9 +1996,9 @@ function shouldShowChart(aiResponse: string): ChartType | null {
           console.error('Failed to load sensitivity data:', error);
         }
       }
-    }
-    
-    if (chartToShow === 'scenarioOverlay') {
+      }
+      
+      if (chartToShow === 'scenarioOverlay') {
       // Load scenario overlay data (for now, use current scenario as single scenario)
       // TODO: Allow users to specify multiple scenarios
       setScenarioOverlayData(null); // Clear old cached data
@@ -1726,16 +2032,16 @@ function shouldShowChart(aiResponse: string): ChartType | null {
           console.error('Failed to load scenario overlay data:', error);
         }
       }
-    }
-    
-    const responseContent = botResponse;
-    
-    const currentMonteCarloSummary =
+      }
+      
+      const responseContent = botResponse;
+      
+      const currentMonteCarloSummary =
       unifiedAnalysisResult?.monteCarloHomePrices ??
       unifiedAnalysisResult?.monte_carlo_home_prices ??
       monteCarloData;
 
-    const snapshotData = analysisResult && analysisInputs
+      const snapshotData = analysisResult && analysisInputs
       ? {
           ...buildSnapshotData(analysisResult, analysisInputs, currentMonteCarloSummary),
           analysis: unifiedAnalysisResult ?? undefined,
@@ -1767,62 +2073,63 @@ function shouldShowChart(aiResponse: string): ChartType | null {
               }
             }
           : null);
-    
-    let assistantMessage: Message;
-    if (chartToShow && (chartsReady || hasAllData) && snapshotData) {
-      // AI wants to show a chart and we have the data
-      // If this is the first chart after showing the scenario summary, add an intro sentence
-      let finalResponseContent = responseContent;
-      if (chartToShow === 'monteCarlo' && !responseContent.toLowerCase().includes('takes a bit longer')) {
-        finalResponseContent = `Heads up, this Monte Carlo simulation runs hundreds of price paths so it takes a bit longer than the other charts. I’ll show it as soon as it’s ready.\n\n${finalResponseContent}`;
+      
+      let assistantMessage: Message;
+      if (chartToShow && (chartsReady || hasAllData) && snapshotData) {
+        // AI wants to show a chart and we have the data
+        // If this is the first chart after showing the scenario summary, add an intro sentence
+        let finalResponseContent = responseContent;
+        if (chartToShow === 'monteCarlo' && !responseContent.toLowerCase().includes('takes a bit longer')) {
+          finalResponseContent = `Heads up, this Monte Carlo simulation runs hundreds of price paths so it takes a bit longer than the other charts. I'll show it as soon as it's ready.\n\n${finalResponseContent}`;
+        }
+        if (
+          chartToShow === 'monthlyCost' &&
+          hasShownScenarioSummary &&
+          analysisApplied &&
+          !responseContent.toLowerCase().includes("let's start")
+        ) {
+          // This is the first chart after summary - add a brief intro if not already present
+          finalResponseContent = `Let's start with a simple monthly cost comparison. Then we can look at net worth, equity, and risk.\n\n${responseContent}`;
+        }
+        
+        assistantMessage = {
+          id: (Date.now() + 1).toString(),
+          role: 'assistant',
+          content: finalResponseContent,
+          chartToShow,
+          snapshotData
+        };
+        
+        // Smooth scroll to the new chart after a brief delay
+        setTimeout(() => {
+          messagesEndRef.current?.scrollIntoView({ 
+            behavior: 'smooth',
+            block: 'end'
+          });
+        }, 300);
+      } else {
+        // Normal AI response without chart
+        assistantMessage = {
+          id: (Date.now() + 1).toString(),
+          role: 'assistant',
+          content: responseContent,
+          // Show action buttons if this is the message after analysis completion
+          showActionButtons: !!(analysisApplied && hasAllData && analysisResult && !chartToShow)
+        };
       }
-      if (
-        chartToShow === 'monthlyCost' &&
-        hasShownScenarioSummary &&
-        analysisApplied &&
-        !responseContent.toLowerCase().includes("let's start")
-      ) {
-        // This is the first chart after summary - add a brief intro if not already present
-        finalResponseContent = `Let's start with a simple monthly cost comparison. Then we can look at net worth, equity, and risk.\n\n${responseContent}`;
+      
+      // Charts will be calculated and displayed automatically when all data is collected
+      // Show reference box if user never used ZIP code (normal flow without location data)
+      if (hasAllData && !chartsReady && !isLocationLocked && !locationData) {
+        setIsLocationLocked(true);
+        setUsingZipData(false);
       }
       
-      assistantMessage = {
-      id: (Date.now() + 1).toString(),
-      role: 'assistant',
-        content: finalResponseContent,
-        chartToShow,
-        snapshotData
-      };
-      
-      // Smooth scroll to the new chart after a brief delay
-      setTimeout(() => {
-        messagesEndRef.current?.scrollIntoView({ 
-          behavior: 'smooth',
-          block: 'end'
-        });
-      }, 300);
-      
-    } else {
-      // Normal AI response without chart
-      assistantMessage = {
-        id: (Date.now() + 1).toString(),
-        role: 'assistant',
-        content: responseContent
-      };
-    }
-    
-    // Charts will be calculated and displayed automatically when all data is collected
-    // Show reference box if user never used ZIP code (normal flow without location data)
-    if (hasAllData && !chartsReady && !isLocationLocked && !locationData) {
-      setIsLocationLocked(true);
-      setUsingZipData(false);
-    }
-    
-    // Then add bot response
-    setMessages(prev => [...prev, assistantMessage]);
-    setIsLoading(false);
-    setIsAnalyzing(false); // Reset analysis flag
-    setLoadingProgress({ stage: 'Starting...', progress: 0 }); // Reset progress when done
+      // Then add bot response
+      setMessages(prev => [...prev, assistantMessage]);
+      setIsLoading(false);
+      setIsAnalyzing(false); // Reset analysis flag
+      setLoadingProgress({ stage: 'Starting...', progress: 0 }); // Reset progress when done
     } catch (error) {
       console.error('Error in handleSendMessage:', error);
       setIsLoading(false);
@@ -1830,7 +2137,7 @@ function shouldShowChart(aiResponse: string): ChartType | null {
       
       // Show error message to user
       const errorMessage: Message = {
-        id: Date.now().toString(),
+        id: generateMessageId(),
         role: 'assistant',
         content: "I didn't quite catch that. Could you share the home price, monthly rent, down payment %, and timeline you're comparing? Mention a ZIP or city if you want me to refresh the local assumptions."
       };
@@ -2072,8 +2379,13 @@ const handleChipClick = (message: string) => {
       }
     }, 2000); // Update every 2 seconds
     
+    console.log('[ANALYSIS] Starting...', { zipCode: zipCode || 'none', monteCarlo: includeMonteCarlo });
+    const analysisStartTime = Date.now();
+    
     try {
       const response = await analyzeScenario(inputs, false, zipCode || undefined, includeMonteCarlo, MONTE_CARLO_PATHS);
+      const analysisDuration = Date.now() - analysisStartTime;
+      console.log('[ANALYSIS] ✅ Completed', { duration: `${(analysisDuration / 1000).toFixed(1)}s` });
       clearInterval(progressInterval);
       setLoadingProgress({ stage: 'Complete!', progress: 100 });
       // Small delay to show 100% before clearing
@@ -2087,9 +2399,11 @@ const handleChipClick = (message: string) => {
       setMonteCarloData(mcData || null);
       if (includeMonteCarlo) {
         if (mcData) {
+          console.log('[MONTE CARLO] ✅ Data received');
           setChartLoading({ type: 'monteCarlo', progress: 100, message: 'Complete!' });
           setTimeout(() => setChartLoading({ type: null, progress: 0, message: '' }), 500);
         } else {
+          console.warn('[MONTE CARLO] ⚠️ No data');
           setChartLoading({ type: 'monteCarlo', progress: 0, message: 'Monte Carlo data unavailable' });
           setTimeout(() => setChartLoading({ type: null, progress: 0, message: '' }), 2000);
         }
@@ -2111,9 +2425,12 @@ const handleChipClick = (message: string) => {
       }
       console.error('❌ [DEBUG] Failed to analyze scenario via backend:', error);
       
-      // Check if it's a timeout error
-      if (error?.message?.includes('timed out') || error?.message?.includes('timeout')) {
-        console.warn('⚠️ Backend analysis timed out, using local fallback');
+      // Check if it's a timeout or network error
+      const isTimeout = error?.message?.includes('timed out') || error?.message?.includes('timeout');
+      const isNetworkError = error?.message?.includes('Load failed') || error?.message?.includes('Failed to fetch') || error?.name === 'TypeError';
+      
+      if (isTimeout || isNetworkError) {
+        console.warn(`⚠️ Backend analysis ${isTimeout ? 'timed out' : 'failed'} (${error?.message || 'network error'}), using local fallback`);
         // Don't show error message - just use local calculations silently
         // The user will still get results, just without ML predictions
       }
@@ -2182,10 +2499,23 @@ const handleChipClick = (message: string) => {
     if (!inputs) return null;
 
     const result = await runAnalysis(inputs, currentZipCode);
+    
+    console.log('[DEBUG] calculateAndShowChart - Analysis completed:', {
+      hasAnalysis: !!result.analysis,
+      hasUnifiedAnalysis: !!result.unifiedAnalysis,
+      unifiedAnalysisKeys: result.unifiedAnalysis ? Object.keys(result.unifiedAnalysis) : null,
+      timelineLength: result.unifiedAnalysis?.timeline?.length ?? 0
+    });
+    
     applyAnalysis(result.analysis);
+    console.log('[DEBUG] calculateAndShowChart - applyAnalysis called, chartsReady should be true now');
+    
     // Update unified analysis result
     if (result.unifiedAnalysis) {
       setUnifiedAnalysisResult(result.unifiedAnalysis);
+      console.log('[DEBUG] calculateAndShowChart - unifiedAnalysisResult set');
+    } else {
+      console.log('[DEBUG] calculateAndShowChart - WARNING: No unifiedAnalysis in result!');
     }
 
     return {
@@ -2244,9 +2574,18 @@ const handleChipClick = (message: string) => {
       hoaMonthly: overrides?.hoaMonthly ?? 150,
       maintenanceRate: overrides?.maintenanceRate ?? 1.0,
       renterInsuranceAnnual: overrides?.renterInsuranceAnnual ?? 240,
+      // Additional costs - use user overrides if provided
+      closingCostsPercent: overrides?.closingCostsPercent ?? 3.0,
+      pmiRate: overrides?.pmiRate ?? 0.5,
+      sellingCostsPercent: 6.0, // Default 6% for real estate commission
+      // Tax information
+      federalTaxRate: overrides?.federalTaxRate ?? 22,
+      stateTaxRate: overrides?.stateTaxRate ?? 5,
+      taxFilingStatus: overrides?.taxFilingStatus ?? 'single',
+      // Growth assumptions - prioritize user override for investmentReturnRate
       homeAppreciationRate: rateSource.homeAppreciationRate,
       rentGrowthRate: rateSource.rentGrowthRate,
-      investmentReturnRate: rateSource.investmentReturnRate
+      investmentReturnRate: overrides?.investmentReturnRate ?? rateSource.investmentReturnRate
     };
   };
 
@@ -2298,7 +2637,7 @@ const handleChipClick = (message: string) => {
   };
   
   // Helper function to render chart based on type - uses message's snapshot data
-  const renderChart = (chartType: ChartType, snapshotData?: Message['snapshotData']) => {
+  const renderChart = (chartType: ChartType, snapshotData?: Message['snapshotData'], isExport?: boolean) => {
     // First, declare all variables we need
     const analysis = snapshotData?.analysis;
     const timeline = analysis?.timeline?.map(normalizeTimelinePoint);
@@ -2441,7 +2780,7 @@ const handleChipClick = (message: string) => {
       case 'netWorth':
         return timeline ? (
           <div className="chart-wrapper">
-            <NetWorthChart timeline={timeline} />
+            <NetWorthChart timeline={timeline} isExport={isExport} />
           </div>
         ) : data ? (
           <div className="chart-wrapper">
@@ -2466,13 +2805,13 @@ const handleChipClick = (message: string) => {
               homeEquity: s.homeEquity,
               renterInvestmentBalance: s.investedDownPayment,
               buyerCashAccount: 0,
-            }))} />
+            }))} isExport={isExport} />
           </div>
         ) : null;
       case 'monthlyCost':
         return timeline ? (
           <div className="chart-wrapper">
-            <MonthlyCostChart timeline={timeline} />
+            <MonthlyCostChart timeline={timeline} isExport={isExport} />
           </div>
         ) : costs ? (
           <div className="chart-wrapper">
@@ -2497,7 +2836,7 @@ const handleChipClick = (message: string) => {
               homeEquity: 0,
               renterInvestmentBalance: 0,
               buyerCashAccount: 0,
-            }]} />
+            }]} isExport={isExport} />
           </div>
         ) : null;
       case 'totalCost':
@@ -2514,7 +2853,7 @@ const handleChipClick = (message: string) => {
         if (normalizedAnalysis && normalizedAnalysis.timeline.length > 0) {
           return (
             <div className="chart-wrapper">
-              <TotalCostChart analysis={normalizedAnalysis} />
+              <TotalCostChart analysis={normalizedAnalysis} isExport={isExport} />
             </div>
           );
         }
@@ -2528,7 +2867,7 @@ const handleChipClick = (message: string) => {
                 breakEven: breakEven || { monthIndex: null, year: null },
                 totalBuyCost: totalData.totalBuyingCosts,
                 totalRentCost: totalData.totalRentingCosts,
-              }} />
+              }} isExport={isExport} />
             </div>
           );
         }
@@ -2566,7 +2905,7 @@ const handleChipClick = (message: string) => {
                 breakEven: breakEven || { monthIndex: null, year: null },
                 totalBuyCost: totalData.totalBuyingCosts,
                 totalRentCost: totalData.totalRentingCosts,
-              }} />
+              }} isExport={isExport} />
             </div>
           );
         }
@@ -2576,7 +2915,7 @@ const handleChipClick = (message: string) => {
       case 'equity':
         return timeline ? (
           <div className="chart-wrapper">
-            <EquityBuildupChart timeline={timeline} />
+            <EquityBuildupChart timeline={timeline} isExport={isExport} />
           </div>
         ) : data ? (
           <div className="chart-wrapper">
@@ -2601,13 +2940,13 @@ const handleChipClick = (message: string) => {
               homeEquity: s.homeEquity,
               renterInvestmentBalance: s.investedDownPayment,
               buyerCashAccount: 0,
-            }))} />
+            }))} isExport={isExport} />
           </div>
         ) : null;
       case 'rentGrowth':
         return timeline ? (
           <div className="chart-wrapper">
-            <RentGrowthChart timeline={timeline} />
+            <RentGrowthChart timeline={timeline} isExport={isExport} />
           </div>
         ) : (data && costs) ? (
           <div className="chart-wrapper">
@@ -2632,7 +2971,7 @@ const handleChipClick = (message: string) => {
               homeEquity: s.homeEquity,
               renterInvestmentBalance: s.investedDownPayment,
               buyerCashAccount: 0,
-            }))} />
+            }))} isExport={isExport} />
           </div>
         ) : null;
       case 'breakEven':
@@ -2660,7 +2999,7 @@ const handleChipClick = (message: string) => {
           console.log('[BREAKEVEN] Rendering with normalized analysis');
           return (
             <div className="chart-wrapper">
-              <BreakEvenChart analysis={normalizedBreakEvenAnalysis} />
+              <BreakEvenChart analysis={normalizedBreakEvenAnalysis} isExport={isExport} />
             </div>
           );
         }
@@ -2696,7 +3035,7 @@ const handleChipClick = (message: string) => {
               breakEven: { monthIndex: null, year: null },
               totalBuyCost: 0,
               totalRentCost: 0,
-              }} />
+              }} isExport={isExport} />
             </div>
           );
         }
@@ -2732,7 +3071,7 @@ const handleChipClick = (message: string) => {
         }
         return (
           <div className="chart-wrapper">
-            <CashFlowChart data={cashFlowSeries} />
+            <CashFlowChart data={cashFlowSeries} isExport={isExport} />
           </div>
         );
       case 'cumulativeCost':
@@ -2752,7 +3091,7 @@ const handleChipClick = (message: string) => {
         }
         return (
           <div className="chart-wrapper">
-            <CumulativeCostChart data={cumulativeSeries} />
+            <CumulativeCostChart data={cumulativeSeries} isExport={isExport} />
           </div>
         );
       case 'liquidity':
@@ -2805,7 +3144,7 @@ const handleChipClick = (message: string) => {
         }
         return (
           <div className="chart-wrapper">
-            <TaxSavingsChart data={taxSeries} />
+            <TaxSavingsChart data={taxSeries} isExport={isExport} />
           </div>
         );
       case 'breakEvenHeatmap':
@@ -2825,7 +3164,7 @@ const handleChipClick = (message: string) => {
         }
         return (
           <div className="chart-wrapper">
-            <BreakEvenHeatmap points={heatmapPoints} />
+            <BreakEvenHeatmap points={heatmapPoints} isExport={isExport} />
           </div>
         );
       case 'monteCarlo':
@@ -2840,7 +3179,7 @@ const handleChipClick = (message: string) => {
             // New format (HomePricePathSummary)
             return (
               <div className="chart-wrapper">
-                <MonteCarloChart monteCarloHomePrices={monteCarloData} />
+                <MonteCarloChart monteCarloHomePrices={monteCarloData} isExport={isExport} />
               </div>
             );
           } else if (monteCarloData.runs && monteCarloData.summary) {
@@ -2888,7 +3227,7 @@ const handleChipClick = (message: string) => {
         }
         return (
           <div className="chart-wrapper">
-            <SensitivityChart results={sensitivity} />
+            <SensitivityChart results={sensitivity} isExport={isExport} />
           </div>
         );
       case 'scenarioOverlay':
@@ -2920,7 +3259,7 @@ const handleChipClick = (message: string) => {
         console.log('[SCENARIO OVERLAY] Data available, rendering chart');
         return (
           <div className="chart-wrapper">
-            <ScenarioOverlayChart scenarios={scenarioOverlay} />
+            <ScenarioOverlayChart scenarios={scenarioOverlay} isExport={isExport} />
           </div>
         );
       default:
@@ -2929,6 +3268,13 @@ const handleChipClick = (message: string) => {
   };
   
   const applyAnalysis = (analysis: CalculatorOutput) => {
+    console.log('[DEBUG] applyAnalysis called with:', {
+      hasMonthlySnapshots: !!analysis.monthlySnapshots,
+      snapshotsLength: analysis.monthlySnapshots?.length ?? 0,
+      hasMonthlyCosts: !!analysis.monthlyCosts,
+      hasTotals: !!analysis.totals
+    });
+    
     setChartData(analysis.monthlySnapshots);
     setMonthlyCosts({
       buying: analysis.monthlyCosts,
@@ -2942,7 +3288,35 @@ const handleChipClick = (message: string) => {
       taxSavings: analysis.taxSavings ?? null
     });
     setChartsReady(true);
+    console.log('[DEBUG] applyAnalysis complete - chartsReady set to true');
   };
+
+  // Memoize timeline normalization to prevent infinite re-renders
+  const normalizedTimeline = useMemo(() => {
+    if (!unifiedAnalysisResult?.timeline) return undefined;
+    return unifiedAnalysisResult.timeline.map(p => ({
+      monthIndex: (p as any).month_index ?? p.monthIndex ?? 0,
+      year: (p as any).year ?? Math.ceil(((p as any).month_index ?? p.monthIndex ?? 0) / 12),
+      netWorthBuy: (p as any).net_worth_buy ?? p.netWorthBuy ?? 0,
+      netWorthRent: (p as any).net_worth_rent ?? p.netWorthRent ?? 0,
+      totalCostBuyToDate: (p as any).total_cost_buy_to_date ?? p.totalCostBuyToDate ?? 0,
+      totalCostRentToDate: (p as any).total_cost_rent_to_date ?? p.totalCostRentToDate ?? 0,
+      buyMonthlyOutflow: (p as any).buy_monthly_outflow ?? p.buyMonthlyOutflow ?? 0,
+      rentMonthlyOutflow: (p as any).rent_monthly_outflow ?? p.rentMonthlyOutflow ?? 0,
+      mortgagePayment: (p as any).mortgage_payment ?? p.mortgagePayment ?? 0,
+      propertyTaxMonthly: (p as any).property_tax_monthly ?? p.propertyTaxMonthly ?? 0,
+      insuranceMonthly: (p as any).insurance_monthly ?? p.insuranceMonthly ?? 0,
+      maintenanceMonthly: (p as any).maintenance_monthly ?? p.maintenanceMonthly ?? 0,
+      hoaMonthly: (p as any).hoa_monthly ?? p.hoaMonthly ?? 0,
+      principalPaid: (p as any).principal_paid ?? p.principalPaid ?? 0,
+      interestPaid: (p as any).interest_paid ?? p.interestPaid ?? 0,
+      remainingBalance: (p as any).remaining_balance ?? p.remainingBalance ?? 0,
+      homeValue: (p as any).home_value ?? p.homeValue ?? 0,
+      homeEquity: (p as any).home_equity ?? p.homeEquity ?? 0,
+      renterInvestmentBalance: (p as any).renter_investment_balance ?? p.renterInvestmentBalance ?? 0,
+      buyerCashAccount: (p as any).buyer_cash_account ?? p.buyerCashAccount ?? 0,
+    }));
+  }, [unifiedAnalysisResult?.timeline]);
 
   const buildSnapshotData = (
     analysis: CalculatorOutput,
@@ -3018,29 +3392,37 @@ const handleChipClick = (message: string) => {
     locationData?.rentGrowthRate ??
     null;
 
+  const displayLocationData = isLocationEditMode && editableLocationData ? editableLocationData : locationData;
+  const displayHomeGrowth = isLocationEditMode && editableLocationData?.homeAppreciationRate !== null 
+    ? editableLocationData.homeAppreciationRate 
+    : resolvedHomeGrowth;
+  const displayRentGrowth = isLocationEditMode && editableLocationData?.rentGrowthRate !== null 
+    ? editableLocationData.rentGrowthRate 
+    : resolvedRentGrowth;
+
   const locationMetrics = [
     {
       label: 'Median home',
-      value: locationData ? `$${locationData.medianHomePrice.toLocaleString()}` : 'Awaiting data',
+      value: displayLocationData ? `$${displayLocationData.medianHomePrice.toLocaleString()}` : 'Awaiting data',
     },
     {
       label: 'Median rent',
-      value: locationData?.averageRent ? `$${locationData.averageRent.toLocaleString()}/mo` : 'Awaiting data',
+      value: displayLocationData?.averageRent ? `$${displayLocationData.averageRent.toLocaleString()}/mo` : 'Awaiting data',
     },
     {
       label: 'Property tax',
       value:
-        typeof locationData?.propertyTaxRate === 'number'
-          ? `${locationData.propertyTaxRate.toFixed(2)}%`
+        typeof displayLocationData?.propertyTaxRate === 'number'
+          ? `${(displayLocationData.propertyTaxRate * 100).toFixed(2)}%`
           : 'Awaiting data',
     },
     {
       label: 'Home appreciation',
-      value: resolvedHomeGrowth !== null ? `${resolvedHomeGrowth.toFixed(2)}%/yr` : 'Pending',
+      value: displayHomeGrowth !== null ? `${displayHomeGrowth.toFixed(2)}%/yr` : 'Pending',
     },
     {
       label: 'Rent growth',
-      value: resolvedRentGrowth !== null ? `${resolvedRentGrowth.toFixed(2)}%/yr` : 'Pending',
+      value: displayRentGrowth !== null ? `${displayRentGrowth.toFixed(2)}%/yr` : 'Pending',
     },
   ];
 
@@ -3052,10 +3434,10 @@ const handleChipClick = (message: string) => {
     marginBottom: '20px',
   };
 
-  const phaseLabelStyle = {
+  const phaseLabelStyle: React.CSSProperties = {
     fontSize: '12px',
     letterSpacing: '0.08em',
-    textTransform: 'uppercase',
+    textTransform: 'uppercase' as const,
     color: 'rgba(255,255,255,0.6)',
   };
 
@@ -3116,14 +3498,14 @@ const handleChipClick = (message: string) => {
         {activeTab === 'chat' && (
           <div className="rvb-left">
             <section style={locationCardStyle} data-tour-id="phase-one-card">
-              <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px', marginBottom: '16px' }}>
                 <div style={{ flex: '1 1 320px' }}>
                   <span style={phaseLabelStyle}>Phase 1 · Local market data</span>
                   <h3 style={{ margin: '4px 0 0 0', fontSize: '18px', color: 'rgba(255,255,255,0.92)' }}>
                     Local market snapshot
                   </h3>
                   <p style={locationDescriptionStyle}>
-                    I anchor every analysis to real market data. Mention any ZIP code or city in the chat and I’ll refresh these
+                    I anchor every analysis to real market data. Mention any ZIP code or city in the chat and I'll refresh these
                     numbers automatically.
                   </p>
                 </div>
@@ -3142,72 +3524,1670 @@ const handleChipClick = (message: string) => {
               {locationData ? (
                 <>
                   <div style={metricGridStyle}>
-                    {locationMetrics.map((metric) => (
-                      <div key={metric.label} style={metricItemStyle}>
-                        <span style={metricLabelStyle}>{metric.label}: </span>
-                        <span style={metricValueStyle}>{metric.value}</span>
-                      </div>
-                    ))}
+                    {isLocationEditMode && editableLocationData ? (
+                      <>
+                        <div style={metricItemStyle}>
+                          <span style={metricLabelStyle}>Median home: </span>
+                          <input
+                            type="number"
+                            value={editableLocationData.medianHomePrice}
+                            onChange={(e) => handleLocationFieldChange('medianHomePrice', Number(e.target.value))}
+                            style={{
+                              ...metricValueStyle,
+                              background: 'rgba(255,255,255,0.05)',
+                              border: '1px solid rgba(255,255,255,0.12)',
+                              borderRadius: '8px',
+                              padding: '8px 10px',
+                              width: '100%',
+                              marginTop: '4px',
+                            }}
+                          />
+                        </div>
+                        <div style={metricItemStyle}>
+                          <span style={metricLabelStyle}>Median rent: </span>
+                          <input
+                            type="number"
+                            value={editableLocationData.averageRent || ''}
+                            onChange={(e) => handleLocationFieldChange('averageRent', Number(e.target.value))}
+                            style={{
+                              ...metricValueStyle,
+                              background: 'rgba(255,255,255,0.05)',
+                              border: '1px solid rgba(255,255,255,0.12)',
+                              borderRadius: '8px',
+                              padding: '8px 10px',
+                              width: '100%',
+                              marginTop: '4px',
+                            }}
+                          />
+                        </div>
+                        <div style={metricItemStyle}>
+                          <span style={metricLabelStyle}>Property tax (%): </span>
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={editableLocationData.propertyTaxRate * 100}
+                            onChange={(e) => {
+                              const percentValue = Number(e.target.value);
+                              if (!isNaN(percentValue)) {
+                                handleLocationFieldChange('propertyTaxRate', percentValue / 100);
+                              }
+                            }}
+                            style={{
+                              ...metricValueStyle,
+                              background: 'rgba(255,255,255,0.05)',
+                              border: '1px solid rgba(255,255,255,0.12)',
+                              borderRadius: '8px',
+                              padding: '8px 10px',
+                              width: '100%',
+                              marginTop: '4px',
+                              color: 'rgba(255,255,255,0.95)',
+                            }}
+                          />
+                        </div>
+                        <div style={metricItemStyle}>
+                          <span style={metricLabelStyle}>Home appreciation (%/yr): </span>
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={editableLocationData.homeAppreciationRate ?? ''}
+                            onChange={(e) => {
+                              const value = e.target.value === '' ? null : Number(e.target.value);
+                              if (value === null || !isNaN(value)) {
+                                handleLocationFieldChange('homeAppreciationRate', value);
+                              }
+                            }}
+                            style={{
+                              ...metricValueStyle,
+                              background: 'rgba(255,255,255,0.05)',
+                              border: '1px solid rgba(255,255,255,0.12)',
+                              borderRadius: '8px',
+                              padding: '8px 10px',
+                              width: '100%',
+                              marginTop: '4px',
+                              color: 'rgba(255,255,255,0.95)',
+                            }}
+                          />
+                        </div>
+                        <div style={metricItemStyle}>
+                          <span style={metricLabelStyle}>Rent growth (%/yr): </span>
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={editableLocationData.rentGrowthRate ?? ''}
+                            onChange={(e) => {
+                              const value = e.target.value === '' ? null : Number(e.target.value);
+                              if (value === null || !isNaN(value)) {
+                                handleLocationFieldChange('rentGrowthRate', value);
+                              }
+                            }}
+                            style={{
+                              ...metricValueStyle,
+                              background: 'rgba(255,255,255,0.05)',
+                              border: '1px solid rgba(255,255,255,0.12)',
+                              borderRadius: '8px',
+                              padding: '8px 10px',
+                              width: '100%',
+                              marginTop: '4px',
+                              color: 'rgba(255,255,255,0.95)',
+                            }}
+                          />
+                        </div>
+                      </>
+                    ) : (
+                      locationMetrics.map((metric) => (
+                        <div key={metric.label} style={metricItemStyle}>
+                          <span style={metricLabelStyle}>{metric.label}: </span>
+                          <span style={metricValueStyle}>{metric.value}</span>
+                        </div>
+                      ))
+                    )}
                   </div>
-                  <p style={locationFooterStyle}>
-                    Want to compare a different neighborhood? Just mention another ZIP or city in the chat.
-                  </p>
+                  <div style={{ display: 'flex', gap: '12px', marginTop: '16px' }}>
+                    {isLocationEditMode ? (
+                      <>
+                        <button
+                          onClick={handleSaveLocationEdit}
+                          style={{
+                            flex: 1,
+                            padding: '10px 12px',
+                            borderRadius: '8px',
+                            border: 'none',
+                            background: 'rgba(255, 255, 255, 0.1)',
+                            color: 'rgba(255, 255, 255, 0.9)',
+                            cursor: 'pointer',
+                            fontWeight: 500,
+                            fontSize: '14px',
+                          }}
+                        >
+                          Save
+                        </button>
+                        <button
+                          onClick={handleCancelLocationEdit}
+                          style={{
+                            flex: 1,
+                            padding: '10px 12px',
+                            borderRadius: '8px',
+                            border: '1px solid rgba(255, 255, 255, 0.1)',
+                            background: 'rgba(255, 255, 255, 0.05)',
+                            color: 'rgba(255, 255, 255, 0.7)',
+                            cursor: 'pointer',
+                            fontWeight: 500,
+                            fontSize: '14px',
+                          }}
+                        >
+                          Cancel
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <button
+                          onClick={handleEditLocation}
+                          style={{
+                            flex: 1,
+                            padding: '10px 12px',
+                            borderRadius: '8px',
+                            border: '1px solid rgba(255, 255, 255, 0.1)',
+                            background: 'rgba(255, 255, 255, 0.1)',
+                            color: 'rgba(255, 255, 255, 0.9)',
+                            cursor: 'pointer',
+                            fontWeight: 500,
+                            fontSize: '14px',
+                          }}
+                        >
+                          Edit Market Data
+                        </button>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', flex: 1 }}>
+                          <button
+                            onClick={() => setShowHomePurchaseDetails(!showHomePurchaseDetails)}
+                            style={{
+                              width: '100%',
+                              padding: '10px 12px',
+                              borderRadius: '8px',
+                              border: '1px solid rgba(255, 255, 255, 0.1)',
+                              background: showHomePurchaseDetails ? 'rgba(255, 255, 255, 0.15)' : 'rgba(255, 255, 255, 0.05)',
+                              color: 'rgba(255, 255, 255, 0.9)',
+                              cursor: 'pointer',
+                              fontWeight: 500,
+                              fontSize: '13px',
+                            }}
+                          >
+                            🏠 Home Purchase/Rent
+                          </button>
+                          <button
+                            onClick={() => setShowRentDetails(!showRentDetails)}
+                            style={{
+                              width: '100%',
+                              padding: '10px 12px',
+                              borderRadius: '8px',
+                              border: '1px solid rgba(255, 255, 255, 0.1)',
+                              background: showRentDetails ? 'rgba(255, 255, 255, 0.15)' : 'rgba(255, 255, 255, 0.05)',
+                              color: 'rgba(255, 255, 255, 0.9)',
+                              cursor: 'pointer',
+                              fontWeight: 500,
+                              fontSize: '13px',
+                            }}
+                          >
+                            💳 Loan Details
+                          </button>
+                          <button
+                            onClick={() => setShowInvestmentTaxDetails(!showInvestmentTaxDetails)}
+                            style={{
+                              width: '100%',
+                              padding: '10px 12px',
+                              borderRadius: '8px',
+                              border: '1px solid rgba(255, 255, 255, 0.1)',
+                              background: showInvestmentTaxDetails ? 'rgba(255, 255, 255, 0.15)' : 'rgba(255, 255, 255, 0.05)',
+                              color: 'rgba(255, 255, 255, 0.9)',
+                              cursor: 'pointer',
+                              fontWeight: 500,
+                              fontSize: '13px',
+                            }}
+                          >
+                            💰 Investment & Tax
+                          </button>
+                        </div>
+                        {/* Recalculate Button - Show when inputs have changed */}
+                        {hasInputsChanged() && (
+                          <button
+                            onClick={handleRecalculate}
+                            disabled={isAnalyzing}
+                            style={{
+                              width: '100%',
+                              padding: '12px 16px',
+                              borderRadius: '8px',
+                              border: 'none',
+                              background: isAnalyzing 
+                                ? 'rgba(139, 92, 246, 0.3)' 
+                                : 'linear-gradient(135deg, rgba(139, 92, 246, 0.8) 0%, rgba(99, 102, 241, 0.8) 100%)',
+                              color: 'rgba(255, 255, 255, 0.95)',
+                              cursor: isAnalyzing ? 'not-allowed' : 'pointer',
+                              fontWeight: 600,
+                              fontSize: '14px',
+                              marginTop: '12px',
+                              boxShadow: isAnalyzing 
+                                ? 'none' 
+                                : '0 4px 12px rgba(139, 92, 246, 0.3)',
+                              transition: 'all 0.2s ease',
+                              opacity: isAnalyzing ? 0.6 : 1,
+                            }}
+                            onMouseEnter={(e) => {
+                              if (!isAnalyzing) {
+                                e.currentTarget.style.transform = 'translateY(-1px)';
+                                e.currentTarget.style.boxShadow = '0 6px 16px rgba(139, 92, 246, 0.4)';
+                              }
+                            }}
+                            onMouseLeave={(e) => {
+                              if (!isAnalyzing) {
+                                e.currentTarget.style.transform = 'translateY(0)';
+                                e.currentTarget.style.boxShadow = '0 4px 12px rgba(139, 92, 246, 0.3)';
+                              }
+                            }}
+                          >
+                            {isAnalyzing ? '🔄 Recalculating...' : '🔄 Recalculate Analysis'}
+                          </button>
+                        )}
+                      </>
+                    )}
+                  </div>
+                  {/* Modal 1: Home Purchase Details */}
+                  {showHomePurchaseDetails && !isLocationEditMode && createPortal(
+                    <>
+                      {/* Modal Backdrop */}
+                      <div
+                        onClick={() => setShowHomePurchaseDetails(false)}
+                        style={{
+                          position: 'fixed',
+                          top: 0,
+                          left: 0,
+                          right: 0,
+                          bottom: 0,
+                          background: 'rgba(0, 0, 0, 0.75)',
+                          backdropFilter: 'blur(8px)',
+                          WebkitBackdropFilter: 'blur(8px)',
+                          zIndex: 10005,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          padding: '20px',
+                        }}
+                      >
+                        {/* Modal Content */}
+                        <div
+                          onClick={(e) => e.stopPropagation()}
+                          style={{
+                            background: 'linear-gradient(135deg, rgba(12, 16, 27, 0.98) 0%, rgba(15, 23, 42, 0.98) 100%)',
+                            border: '1px solid rgba(139, 92, 246, 0.3)',
+                            borderRadius: '20px',
+                            padding: '32px',
+                            maxWidth: '700px',
+                            width: '100%',
+                            maxHeight: '90vh',
+                            overflowY: 'auto',
+                            boxShadow: '0 20px 60px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(139, 92, 246, 0.1)',
+                            zIndex: 10006,
+                            position: 'relative',
+                          }}
+                        >
+                          {/* Close Button */}
+                          <button
+                            onClick={() => setShowHomePurchaseDetails(false)}
+                            style={{
+                              position: 'absolute',
+                              top: '20px',
+                              right: '20px',
+                              background: 'rgba(255, 255, 255, 0.1)',
+                              border: '1px solid rgba(255, 255, 255, 0.15)',
+                              borderRadius: '50%',
+                              width: '32px',
+                              height: '32px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              cursor: 'pointer',
+                              color: 'rgba(255, 255, 255, 0.8)',
+                              fontSize: '18px',
+                              transition: 'all 0.2s ease',
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)';
+                              e.currentTarget.style.borderColor = 'rgba(139, 92, 246, 0.5)';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
+                              e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.15)';
+                            }}
+                          >
+                            ×
+                          </button>
+
+                          {/* Header */}
+                          <div style={{ marginBottom: '24px', paddingRight: '40px' }}>
+                            <h3 style={{
+                              margin: '0 0 8px 0',
+                              fontSize: '24px',
+                              fontWeight: 600,
+                              color: 'rgba(255, 255, 255, 0.95)',
+                              background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(139, 92, 246, 0.9) 100%)',
+                              WebkitBackgroundClip: 'text',
+                              WebkitTextFillColor: 'transparent',
+                              backgroundClip: 'text',
+                            }}>
+                              Home Purchase/Rent Details
+                            </h3>
+                            <p style={{
+                              margin: 0,
+                              fontSize: '14px',
+                              color: 'rgba(255, 255, 255, 0.65)',
+                              lineHeight: '1.5',
+                            }}>
+                              Configure home purchase, ownership costs, and renting details including taxes, insurance, and maintenance.
+                            </p>
+                          </div>
+
+                          {/* Fields Grid */}
+                          <div style={{
+                            display: 'grid',
+                            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                            gap: '16px',
+                          }}>
+                            {/* Time Horizon Years */}
+                            <div style={{
+                              border: '1px solid rgba(255, 255, 255, 0.1)',
+                              borderRadius: '12px',
+                              padding: '16px',
+                              background: 'rgba(255, 255, 255, 0.03)',
+                              transition: 'all 0.2s ease',
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.borderColor = 'rgba(139, 92, 246, 0.4)';
+                              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)';
+                              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.03)';
+                            }}
+                            >
+                              <div style={{
+                                fontSize: '12px',
+                                color: 'rgba(255, 255, 255, 0.65)',
+                                marginBottom: '8px',
+                                fontWeight: 500,
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.5px',
+                              }}>
+                                Time Horizon
+                              </div>
+                              <input
+                                type="number"
+                                step="1"
+                                min="1"
+                                value={userData.timeHorizonYears ?? ''}
+                                onChange={(e) => {
+                                  const value = e.target.value === '' ? null : Number(e.target.value);
+                                  setUserData(prev => ({ ...prev, timeHorizonYears: value }));
+                                }}
+                                placeholder="5"
+                                style={{
+                                  width: '100%',
+                                  borderRadius: '8px',
+                                  border: '1px solid rgba(255, 255, 255, 0.15)',
+                                  background: 'rgba(255, 255, 255, 0.08)',
+                                  color: 'rgba(255, 255, 255, 0.95)',
+                                  padding: '10px 12px',
+                                  fontSize: '15px',
+                                  fontWeight: 600,
+                                  outline: 'none',
+                                  transition: 'all 0.2s ease',
+                                }}
+                                onFocus={(e) => {
+                                  e.target.style.borderColor = 'rgba(139, 92, 246, 0.6)';
+                                  e.target.style.background = 'rgba(255, 255, 255, 0.12)';
+                                }}
+                                onBlur={(e) => {
+                                  e.target.style.borderColor = 'rgba(255, 255, 255, 0.15)';
+                                  e.target.style.background = 'rgba(255, 255, 255, 0.08)';
+                                }}
+                              />
+                              <div style={{
+                                fontSize: '11px',
+                                color: 'rgba(255, 255, 255, 0.5)',
+                                marginTop: '4px',
+                              }}>
+                                years
+                              </div>
+                            </div>
+
+                            {/* Loan Term */}
+                            <div style={{
+                              border: '1px solid rgba(255, 255, 255, 0.1)',
+                              borderRadius: '12px',
+                              padding: '16px',
+                              background: 'rgba(255, 255, 255, 0.03)',
+                              transition: 'all 0.2s ease',
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.borderColor = 'rgba(139, 92, 246, 0.4)';
+                              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)';
+                              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.03)';
+                            }}
+                            >
+                              <div style={{
+                                fontSize: '12px',
+                                color: 'rgba(255, 255, 255, 0.65)',
+                                marginBottom: '8px',
+                                fontWeight: 500,
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.5px',
+                              }}>
+                                Loan Term
+                              </div>
+                              <input
+                                type="number"
+                                step="1"
+                                value={getAdvancedValue('loanTermYears') as number}
+                                onChange={(e) => handleAdvancedFieldChange('loanTermYears', Number(e.target.value))}
+                                style={{
+                                  width: '100%',
+                                  borderRadius: '8px',
+                                  border: '1px solid rgba(255, 255, 255, 0.15)',
+                                  background: 'rgba(255, 255, 255, 0.08)',
+                                  color: 'rgba(255, 255, 255, 0.95)',
+                                  padding: '10px 12px',
+                                  fontSize: '15px',
+                                  fontWeight: 600,
+                                  outline: 'none',
+                                  transition: 'all 0.2s ease',
+                                }}
+                                onFocus={(e) => {
+                                  e.target.style.borderColor = 'rgba(139, 92, 246, 0.6)';
+                                  e.target.style.background = 'rgba(255, 255, 255, 0.12)';
+                                }}
+                                onBlur={(e) => {
+                                  e.target.style.borderColor = 'rgba(255, 255, 255, 0.15)';
+                                  e.target.style.background = 'rgba(255, 255, 255, 0.08)';
+                                }}
+                              />
+                              <div style={{
+                                fontSize: '11px',
+                                color: 'rgba(255, 255, 255, 0.5)',
+                                marginTop: '4px',
+                              }}>
+                                years
+                              </div>
+                            </div>
+
+                            {/* Mortgage Rate */}
+                            <div style={{
+                              border: '1px solid rgba(255, 255, 255, 0.1)',
+                              borderRadius: '12px',
+                              padding: '16px',
+                              background: 'rgba(255, 255, 255, 0.03)',
+                              transition: 'all 0.2s ease',
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.borderColor = 'rgba(139, 92, 246, 0.4)';
+                              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)';
+                              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.03)';
+                            }}
+                            >
+                              <div style={{
+                                fontSize: '12px',
+                                color: 'rgba(255, 255, 255, 0.65)',
+                                marginBottom: '8px',
+                                fontWeight: 500,
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.5px',
+                              }}>
+                                Mortgage Rate
+                              </div>
+                              <input
+                                type="number"
+                                step="0.1"
+                                value={getAdvancedValue('interestRate') as number}
+                                onChange={(e) => handleAdvancedFieldChange('interestRate', Number(e.target.value))}
+                                style={{
+                                  width: '100%',
+                                  borderRadius: '8px',
+                                  border: '1px solid rgba(255, 255, 255, 0.15)',
+                                  background: 'rgba(255, 255, 255, 0.08)',
+                                  color: 'rgba(255, 255, 255, 0.95)',
+                                  padding: '10px 12px',
+                                  fontSize: '15px',
+                                  fontWeight: 600,
+                                  outline: 'none',
+                                  transition: 'all 0.2s ease',
+                                }}
+                                onFocus={(e) => {
+                                  e.target.style.borderColor = 'rgba(139, 92, 246, 0.6)';
+                                  e.target.style.background = 'rgba(255, 255, 255, 0.12)';
+                                }}
+                                onBlur={(e) => {
+                                  e.target.style.borderColor = 'rgba(255, 255, 255, 0.15)';
+                                  e.target.style.background = 'rgba(255, 255, 255, 0.08)';
+                                }}
+                              />
+                              <div style={{
+                                fontSize: '11px',
+                                color: 'rgba(255, 255, 255, 0.5)',
+                                marginTop: '4px',
+                              }}>
+                                annual %
+                              </div>
+                            </div>
+
+                            {/* Property Tax Rate */}
+                            <div style={{
+                              border: '1px solid rgba(255, 255, 255, 0.1)',
+                              borderRadius: '12px',
+                              padding: '16px',
+                              background: 'rgba(255, 255, 255, 0.03)',
+                              transition: 'all 0.2s ease',
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.borderColor = 'rgba(139, 92, 246, 0.4)';
+                              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)';
+                              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.03)';
+                            }}
+                            >
+                              <div style={{
+                                fontSize: '12px',
+                                color: 'rgba(255, 255, 255, 0.65)',
+                                marginBottom: '8px',
+                                fontWeight: 500,
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.5px',
+                              }}>
+                                Property Tax Rate
+                              </div>
+                              <input
+                                type="number"
+                                step="0.1"
+                                value={getAdvancedValue('propertyTaxRate') as number}
+                                onChange={(e) => handleAdvancedFieldChange('propertyTaxRate', Number(e.target.value))}
+                                style={{
+                                  width: '100%',
+                                  borderRadius: '8px',
+                                  border: '1px solid rgba(255, 255, 255, 0.15)',
+                                  background: 'rgba(255, 255, 255, 0.08)',
+                                  color: 'rgba(255, 255, 255, 0.95)',
+                                  padding: '10px 12px',
+                                  fontSize: '15px',
+                                  fontWeight: 600,
+                                  outline: 'none',
+                                  transition: 'all 0.2s ease',
+                                }}
+                                onFocus={(e) => {
+                                  e.target.style.borderColor = 'rgba(139, 92, 246, 0.6)';
+                                  e.target.style.background = 'rgba(255, 255, 255, 0.12)';
+                                }}
+                                onBlur={(e) => {
+                                  e.target.style.borderColor = 'rgba(255, 255, 255, 0.15)';
+                                  e.target.style.background = 'rgba(255, 255, 255, 0.08)';
+                                }}
+                              />
+                              <div style={{
+                                fontSize: '11px',
+                                color: 'rgba(255, 255, 255, 0.5)',
+                                marginTop: '4px',
+                              }}>
+                                annual %
+                              </div>
+                            </div>
+
+                            {/* Maintenance Rate */}
+                            <div style={{
+                              border: '1px solid rgba(255, 255, 255, 0.1)',
+                              borderRadius: '12px',
+                              padding: '16px',
+                              background: 'rgba(255, 255, 255, 0.03)',
+                              transition: 'all 0.2s ease',
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.borderColor = 'rgba(139, 92, 246, 0.4)';
+                              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)';
+                              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.03)';
+                            }}
+                            >
+                              <div style={{
+                                fontSize: '12px',
+                                color: 'rgba(255, 255, 255, 0.65)',
+                                marginBottom: '8px',
+                                fontWeight: 500,
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.5px',
+                              }}>
+                                Maintenance Rate
+                              </div>
+                              <input
+                                type="number"
+                                step="0.1"
+                                value={getAdvancedValue('maintenanceRate') as number}
+                                onChange={(e) => handleAdvancedFieldChange('maintenanceRate', Number(e.target.value))}
+                                style={{
+                                  width: '100%',
+                                  borderRadius: '8px',
+                                  border: '1px solid rgba(255, 255, 255, 0.15)',
+                                  background: 'rgba(255, 255, 255, 0.08)',
+                                  color: 'rgba(255, 255, 255, 0.95)',
+                                  padding: '10px 12px',
+                                  fontSize: '15px',
+                                  fontWeight: 600,
+                                  outline: 'none',
+                                  transition: 'all 0.2s ease',
+                                }}
+                                onFocus={(e) => {
+                                  e.target.style.borderColor = 'rgba(139, 92, 246, 0.6)';
+                                  e.target.style.background = 'rgba(255, 255, 255, 0.12)';
+                                }}
+                                onBlur={(e) => {
+                                  e.target.style.borderColor = 'rgba(255, 255, 255, 0.15)';
+                                  e.target.style.background = 'rgba(255, 255, 255, 0.08)';
+                                }}
+                              />
+                              <div style={{
+                                fontSize: '11px',
+                                color: 'rgba(255, 255, 255, 0.5)',
+                                marginTop: '4px',
+                              }}>
+                                annual %
+                              </div>
+                            </div>
+
+                            {/* Home Insurance */}
+                            <div style={{
+                              border: '1px solid rgba(255, 255, 255, 0.1)',
+                              borderRadius: '12px',
+                              padding: '16px',
+                              background: 'rgba(255, 255, 255, 0.03)',
+                              transition: 'all 0.2s ease',
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.borderColor = 'rgba(139, 92, 246, 0.4)';
+                              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)';
+                              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.03)';
+                            }}
+                            >
+                              <div style={{
+                                fontSize: '12px',
+                                color: 'rgba(255, 255, 255, 0.65)',
+                                marginBottom: '8px',
+                                fontWeight: 500,
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.5px',
+                              }}>
+                                Home Insurance
+                              </div>
+                              <input
+                                type="number"
+                                step="100"
+                                value={getAdvancedValue('homeInsuranceAnnual') as number}
+                                onChange={(e) => handleAdvancedFieldChange('homeInsuranceAnnual', Number(e.target.value))}
+                                style={{
+                                  width: '100%',
+                                  borderRadius: '8px',
+                                  border: '1px solid rgba(255, 255, 255, 0.15)',
+                                  background: 'rgba(255, 255, 255, 0.08)',
+                                  color: 'rgba(255, 255, 255, 0.95)',
+                                  padding: '10px 12px',
+                                  fontSize: '15px',
+                                  fontWeight: 600,
+                                  outline: 'none',
+                                  transition: 'all 0.2s ease',
+                                }}
+                                onFocus={(e) => {
+                                  e.target.style.borderColor = 'rgba(139, 92, 246, 0.6)';
+                                  e.target.style.background = 'rgba(255, 255, 255, 0.12)';
+                                }}
+                                onBlur={(e) => {
+                                  e.target.style.borderColor = 'rgba(255, 255, 255, 0.15)';
+                                  e.target.style.background = 'rgba(255, 255, 255, 0.08)';
+                                }}
+                              />
+                              <div style={{
+                                fontSize: '11px',
+                                color: 'rgba(255, 255, 255, 0.5)',
+                                marginTop: '4px',
+                              }}>
+                                $ / year
+                              </div>
+                            </div>
+
+                            {/* HOA Dues */}
+                            <div style={{
+                              border: '1px solid rgba(255, 255, 255, 0.1)',
+                              borderRadius: '12px',
+                              padding: '16px',
+                              background: 'rgba(255, 255, 255, 0.03)',
+                              transition: 'all 0.2s ease',
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.borderColor = 'rgba(139, 92, 246, 0.4)';
+                              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)';
+                              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.03)';
+                            }}
+                            >
+                              <div style={{
+                                fontSize: '12px',
+                                color: 'rgba(255, 255, 255, 0.65)',
+                                marginBottom: '8px',
+                                fontWeight: 500,
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.5px',
+                              }}>
+                                HOA Dues
+                              </div>
+                              <input
+                                type="number"
+                                step="10"
+                                value={getAdvancedValue('hoaMonthly') as number}
+                                onChange={(e) => handleAdvancedFieldChange('hoaMonthly', Number(e.target.value))}
+                                style={{
+                                  width: '100%',
+                                  borderRadius: '8px',
+                                  border: '1px solid rgba(255, 255, 255, 0.15)',
+                                  background: 'rgba(255, 255, 255, 0.08)',
+                                  color: 'rgba(255, 255, 255, 0.95)',
+                                  padding: '10px 12px',
+                                  fontSize: '15px',
+                                  fontWeight: 600,
+                                  outline: 'none',
+                                  transition: 'all 0.2s ease',
+                                }}
+                                onFocus={(e) => {
+                                  e.target.style.borderColor = 'rgba(139, 92, 246, 0.6)';
+                                  e.target.style.background = 'rgba(255, 255, 255, 0.12)';
+                                }}
+                                onBlur={(e) => {
+                                  e.target.style.borderColor = 'rgba(255, 255, 255, 0.15)';
+                                  e.target.style.background = 'rgba(255, 255, 255, 0.08)';
+                                }}
+                              />
+                              <div style={{
+                                fontSize: '11px',
+                                color: 'rgba(255, 255, 255, 0.5)',
+                                marginTop: '4px',
+                              }}>
+                                $ / month
+                              </div>
+                            </div>
+
+                            {/* Renter Insurance */}
+                            <div style={{
+                              border: '1px solid rgba(255, 255, 255, 0.1)',
+                              borderRadius: '12px',
+                              padding: '16px',
+                              background: 'rgba(255, 255, 255, 0.03)',
+                              transition: 'all 0.2s ease',
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.borderColor = 'rgba(139, 92, 246, 0.4)';
+                              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)';
+                              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.03)';
+                            }}
+                            >
+                              <div style={{
+                                fontSize: '12px',
+                                color: 'rgba(255, 255, 255, 0.65)',
+                                marginBottom: '8px',
+                                fontWeight: 500,
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.5px',
+                              }}>
+                                Renter Insurance
+                              </div>
+                              <input
+                                type="number"
+                                step="50"
+                                value={getAdvancedValue('renterInsuranceAnnual') as number}
+                                onChange={(e) => handleAdvancedFieldChange('renterInsuranceAnnual', Number(e.target.value))}
+                                style={{
+                                  width: '100%',
+                                  borderRadius: '8px',
+                                  border: '1px solid rgba(255, 255, 255, 0.15)',
+                                  background: 'rgba(255, 255, 255, 0.08)',
+                                  color: 'rgba(255, 255, 255, 0.95)',
+                                  padding: '10px 12px',
+                                  fontSize: '15px',
+                                  fontWeight: 600,
+                                  outline: 'none',
+                                  transition: 'all 0.2s ease',
+                                }}
+                                onFocus={(e) => {
+                                  e.target.style.borderColor = 'rgba(139, 92, 246, 0.6)';
+                                  e.target.style.background = 'rgba(255, 255, 255, 0.12)';
+                                }}
+                                onBlur={(e) => {
+                                  e.target.style.borderColor = 'rgba(255, 255, 255, 0.15)';
+                                  e.target.style.background = 'rgba(255, 255, 255, 0.08)';
+                                }}
+                              />
+                              <div style={{
+                                fontSize: '11px',
+                                color: 'rgba(255, 255, 255, 0.5)',
+                                marginTop: '4px',
+                              }}>
+                                $ / year
+                              </div>
+                            </div>
+
+                            {/* Closing Costs */}
+                            <div style={{
+                              border: '1px solid rgba(255, 255, 255, 0.1)',
+                              borderRadius: '12px',
+                              padding: '16px',
+                              background: 'rgba(255, 255, 255, 0.03)',
+                              transition: 'all 0.2s ease',
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.borderColor = 'rgba(139, 92, 246, 0.4)';
+                              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)';
+                              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.03)';
+                            }}
+                            >
+                              <div style={{
+                                fontSize: '12px',
+                                color: 'rgba(255, 255, 255, 0.65)',
+                                marginBottom: '8px',
+                                fontWeight: 500,
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.5px',
+                              }}>
+                                Closing Costs
+                              </div>
+                              <input
+                                type="number"
+                                step="0.1"
+                                value={(getAdvancedValue('closingCostsPercent') as number) ?? 3}
+                                onChange={(e) => handleAdvancedFieldChange('closingCostsPercent', Number(e.target.value))}
+                                style={{
+                                  width: '100%',
+                                  borderRadius: '8px',
+                                  border: '1px solid rgba(255, 255, 255, 0.15)',
+                                  background: 'rgba(255, 255, 255, 0.08)',
+                                  color: 'rgba(255, 255, 255, 0.95)',
+                                  padding: '10px 12px',
+                                  fontSize: '15px',
+                                  fontWeight: 600,
+                                  outline: 'none',
+                                  transition: 'all 0.2s ease',
+                                }}
+                                onFocus={(e) => {
+                                  e.target.style.borderColor = 'rgba(139, 92, 246, 0.6)';
+                                  e.target.style.background = 'rgba(255, 255, 255, 0.12)';
+                                }}
+                                onBlur={(e) => {
+                                  e.target.style.borderColor = 'rgba(255, 255, 255, 0.15)';
+                                  e.target.style.background = 'rgba(255, 255, 255, 0.08)';
+                                }}
+                              />
+                              <div style={{
+                                fontSize: '11px',
+                                color: 'rgba(255, 255, 255, 0.5)',
+                                marginTop: '4px',
+                              }}>
+                                % of purchase price
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </>,
+                    document.body
+                  )}
+
+                  {/* Modal 2: Rent Details */}
+                  {showRentDetails && !isLocationEditMode && createPortal(
+                    <>
+                      <div
+                        onClick={() => setShowRentDetails(false)}
+                        style={{
+                          position: 'fixed',
+                          top: 0,
+                          left: 0,
+                          right: 0,
+                          bottom: 0,
+                          background: 'rgba(0, 0, 0, 0.75)',
+                          backdropFilter: 'blur(8px)',
+                          WebkitBackdropFilter: 'blur(8px)',
+                          zIndex: 10005,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          padding: '20px',
+                        }}
+                      >
+                        <div
+                          onClick={(e) => e.stopPropagation()}
+                          style={{
+                            background: 'linear-gradient(135deg, rgba(12, 16, 27, 0.98) 0%, rgba(15, 23, 42, 0.98) 100%)',
+                            border: '1px solid rgba(139, 92, 246, 0.3)',
+                            borderRadius: '20px',
+                            padding: '32px',
+                            maxWidth: '700px',
+                            width: '100%',
+                            maxHeight: '90vh',
+                            overflowY: 'auto',
+                            boxShadow: '0 20px 60px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(139, 92, 246, 0.1)',
+                            zIndex: 10006,
+                            position: 'relative',
+                          }}
+                        >
+                          <button
+                            onClick={() => setShowRentDetails(false)}
+                            style={{
+                              position: 'absolute',
+                              top: '20px',
+                              right: '20px',
+                              background: 'rgba(255, 255, 255, 0.1)',
+                              border: '1px solid rgba(255, 255, 255, 0.15)',
+                              borderRadius: '50%',
+                              width: '32px',
+                              height: '32px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              cursor: 'pointer',
+                              color: 'rgba(255, 255, 255, 0.8)',
+                              fontSize: '18px',
+                              transition: 'all 0.2s ease',
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)';
+                              e.currentTarget.style.borderColor = 'rgba(139, 92, 246, 0.5)';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
+                              e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.15)';
+                            }}
+                          >
+                            ×
+                          </button>
+                          <div style={{ marginBottom: '24px', paddingRight: '40px' }}>
+                            <h3 style={{
+                              margin: '0 0 8px 0',
+                              fontSize: '24px',
+                              fontWeight: 600,
+                              color: 'rgba(255, 255, 255, 0.95)',
+                              background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(139, 92, 246, 0.9) 100%)',
+                              WebkitBackgroundClip: 'text',
+                              WebkitTextFillColor: 'transparent',
+                              backgroundClip: 'text',
+                            }}>
+                              Loan Details
+                            </h3>
+                            <p style={{
+                              margin: 0,
+                              fontSize: '14px',
+                              color: 'rgba(255, 255, 255, 0.65)',
+                              lineHeight: '1.5',
+                            }}>
+                              Configure mortgage loan terms including interest rate, loan term, and down payment.
+                            </p>
+                          </div>
+                          <div style={{
+                            display: 'grid',
+                            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                            gap: '16px',
+                          }}>
+                            {/* Down Payment Percentage */}
+                            <div style={{
+                              border: '1px solid rgba(255, 255, 255, 0.1)',
+                              borderRadius: '12px',
+                              padding: '16px',
+                              background: 'rgba(255, 255, 255, 0.03)',
+                              transition: 'all 0.2s ease',
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.borderColor = 'rgba(139, 92, 246, 0.4)';
+                              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)';
+                              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.03)';
+                            }}
+                            >
+                              <div style={{
+                                fontSize: '12px',
+                                color: 'rgba(255, 255, 255, 0.65)',
+                                marginBottom: '8px',
+                                fontWeight: 500,
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.5px',
+                              }}>
+                                Down Payment
+                              </div>
+                              <input
+                                type="number"
+                                step="1"
+                                min="0"
+                                max="100"
+                                value={userData.downPaymentPercent ?? ''}
+                                onChange={(e) => {
+                                  const value = e.target.value === '' ? null : Number(e.target.value);
+                                  setUserData(prev => ({ ...prev, downPaymentPercent: value }));
+                                }}
+                                placeholder="20"
+                                style={{
+                                  width: '100%',
+                                  borderRadius: '8px',
+                                  border: '1px solid rgba(255, 255, 255, 0.15)',
+                                  background: 'rgba(255, 255, 255, 0.08)',
+                                  color: 'rgba(255, 255, 255, 0.95)',
+                                  padding: '10px 12px',
+                                  fontSize: '15px',
+                                  fontWeight: 600,
+                                  outline: 'none',
+                                  transition: 'all 0.2s ease',
+                                }}
+                                onFocus={(e) => {
+                                  e.target.style.borderColor = 'rgba(139, 92, 246, 0.6)';
+                                  e.target.style.background = 'rgba(255, 255, 255, 0.12)';
+                                }}
+                                onBlur={(e) => {
+                                  e.target.style.borderColor = 'rgba(255, 255, 255, 0.15)';
+                                  e.target.style.background = 'rgba(255, 255, 255, 0.08)';
+                                }}
+                              />
+                              <div style={{
+                                fontSize: '11px',
+                                color: 'rgba(255, 255, 255, 0.5)',
+                                marginTop: '4px',
+                              }}>
+                                %
+                              </div>
+                            </div>
+
+                            {/* Loan Term */}
+                            <div style={{
+                              border: '1px solid rgba(255, 255, 255, 0.1)',
+                              borderRadius: '12px',
+                              padding: '16px',
+                              background: 'rgba(255, 255, 255, 0.03)',
+                              transition: 'all 0.2s ease',
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.borderColor = 'rgba(139, 92, 246, 0.4)';
+                              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)';
+                              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.03)';
+                            }}
+                            >
+                              <div style={{
+                                fontSize: '12px',
+                                color: 'rgba(255, 255, 255, 0.65)',
+                                marginBottom: '8px',
+                                fontWeight: 500,
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.5px',
+                              }}>
+                                Loan Term
+                              </div>
+                              <input
+                                type="number"
+                                step="1"
+                                value={getAdvancedValue('loanTermYears') as number}
+                                onChange={(e) => handleAdvancedFieldChange('loanTermYears', Number(e.target.value))}
+                                style={{
+                                  width: '100%',
+                                  borderRadius: '8px',
+                                  border: '1px solid rgba(255, 255, 255, 0.15)',
+                                  background: 'rgba(255, 255, 255, 0.08)',
+                                  color: 'rgba(255, 255, 255, 0.95)',
+                                  padding: '10px 12px',
+                                  fontSize: '15px',
+                                  fontWeight: 600,
+                                  outline: 'none',
+                                  transition: 'all 0.2s ease',
+                                }}
+                                onFocus={(e) => {
+                                  e.target.style.borderColor = 'rgba(139, 92, 246, 0.6)';
+                                  e.target.style.background = 'rgba(255, 255, 255, 0.12)';
+                                }}
+                                onBlur={(e) => {
+                                  e.target.style.borderColor = 'rgba(255, 255, 255, 0.15)';
+                                  e.target.style.background = 'rgba(255, 255, 255, 0.08)';
+                                }}
+                              />
+                              <div style={{
+                                fontSize: '11px',
+                                color: 'rgba(255, 255, 255, 0.5)',
+                                marginTop: '4px',
+                              }}>
+                                years
+                              </div>
+                            </div>
+
+                            {/* Mortgage Rate */}
+                            <div style={{
+                              border: '1px solid rgba(255, 255, 255, 0.1)',
+                              borderRadius: '12px',
+                              padding: '16px',
+                              background: 'rgba(255, 255, 255, 0.03)',
+                              transition: 'all 0.2s ease',
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.borderColor = 'rgba(139, 92, 246, 0.4)';
+                              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)';
+                              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.03)';
+                            }}
+                            >
+                              <div style={{
+                                fontSize: '12px',
+                                color: 'rgba(255, 255, 255, 0.65)',
+                                marginBottom: '8px',
+                                fontWeight: 500,
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.5px',
+                              }}>
+                                Mortgage Rate
+                              </div>
+                              <input
+                                type="number"
+                                step="0.1"
+                                value={getAdvancedValue('interestRate') as number}
+                                onChange={(e) => handleAdvancedFieldChange('interestRate', Number(e.target.value))}
+                                style={{
+                                  width: '100%',
+                                  borderRadius: '8px',
+                                  border: '1px solid rgba(255, 255, 255, 0.15)',
+                                  background: 'rgba(255, 255, 255, 0.08)',
+                                  color: 'rgba(255, 255, 255, 0.95)',
+                                  padding: '10px 12px',
+                                  fontSize: '15px',
+                                  fontWeight: 600,
+                                  outline: 'none',
+                                  transition: 'all 0.2s ease',
+                                }}
+                                onFocus={(e) => {
+                                  e.target.style.borderColor = 'rgba(139, 92, 246, 0.6)';
+                                  e.target.style.background = 'rgba(255, 255, 255, 0.12)';
+                                }}
+                                onBlur={(e) => {
+                                  e.target.style.borderColor = 'rgba(255, 255, 255, 0.15)';
+                                  e.target.style.background = 'rgba(255, 255, 255, 0.08)';
+                                }}
+                              />
+                              <div style={{
+                                fontSize: '11px',
+                                color: 'rgba(255, 255, 255, 0.5)',
+                                marginTop: '4px',
+                              }}>
+                                annual %
+                              </div>
+                            </div>
+
+                            {/* PMI Rate - Only show if down payment is less than 20% */}
+                            {(userData.downPaymentPercent == null || userData.downPaymentPercent < 20) && (
+                              <div style={{
+                                border: '1px solid rgba(255, 255, 255, 0.1)',
+                                borderRadius: '12px',
+                                padding: '16px',
+                                background: 'rgba(255, 255, 255, 0.03)',
+                                transition: 'all 0.2s ease',
+                              }}
+                              onMouseEnter={(e) => {
+                                e.currentTarget.style.borderColor = 'rgba(139, 92, 246, 0.4)';
+                                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)';
+                                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.03)';
+                              }}
+                              >
+                                <div style={{
+                                  fontSize: '12px',
+                                  color: 'rgba(255, 255, 255, 0.65)',
+                                  marginBottom: '8px',
+                                  fontWeight: 500,
+                                  textTransform: 'uppercase',
+                                  letterSpacing: '0.5px',
+                                }}>
+                                  PMI Rate
+                                </div>
+                                <input
+                                  type="number"
+                                  step="0.1"
+                                  value={(getAdvancedValue('pmiRate') as number) ?? 0.5}
+                                  onChange={(e) => handleAdvancedFieldChange('pmiRate', Number(e.target.value))}
+                                  style={{
+                                    width: '100%',
+                                    borderRadius: '8px',
+                                    border: '1px solid rgba(255, 255, 255, 0.15)',
+                                    background: 'rgba(255, 255, 255, 0.08)',
+                                    color: 'rgba(255, 255, 255, 0.95)',
+                                    padding: '10px 12px',
+                                    fontSize: '15px',
+                                    fontWeight: 600,
+                                    outline: 'none',
+                                    transition: 'all 0.2s ease',
+                                  }}
+                                  onFocus={(e) => {
+                                    e.target.style.borderColor = 'rgba(139, 92, 246, 0.6)';
+                                    e.target.style.background = 'rgba(255, 255, 255, 0.12)';
+                                  }}
+                                  onBlur={(e) => {
+                                    e.target.style.borderColor = 'rgba(255, 255, 255, 0.15)';
+                                    e.target.style.background = 'rgba(255, 255, 255, 0.08)';
+                                  }}
+                                />
+                                <div style={{
+                                  fontSize: '11px',
+                                  color: 'rgba(255, 255, 255, 0.5)',
+                                  marginTop: '4px',
+                                }}>
+                                  annual % of loan
+                                </div>
+                                <div style={{
+                                  fontSize: '10px',
+                                  color: 'rgba(255, 255, 255, 0.4)',
+                                  marginTop: '4px',
+                                  fontStyle: 'italic',
+                                }}>
+                                  Required when down payment &lt; 20%
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </>,
+                    document.body
+                  )}
+
+                  {/* Modal 3: Investment & Tax Details */}
+                  {showInvestmentTaxDetails && !isLocationEditMode && createPortal(
+                    <>
+                      <div
+                        onClick={() => setShowInvestmentTaxDetails(false)}
+                        style={{
+                          position: 'fixed',
+                          top: 0,
+                          left: 0,
+                          right: 0,
+                          bottom: 0,
+                          background: 'rgba(0, 0, 0, 0.75)',
+                          backdropFilter: 'blur(8px)',
+                          WebkitBackdropFilter: 'blur(8px)',
+                          zIndex: 10005,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          padding: '20px',
+                        }}
+                      >
+                        <div
+                          onClick={(e) => e.stopPropagation()}
+                          style={{
+                            background: 'linear-gradient(135deg, rgba(12, 16, 27, 0.98) 0%, rgba(15, 23, 42, 0.98) 100%)',
+                            border: '1px solid rgba(139, 92, 246, 0.3)',
+                            borderRadius: '20px',
+                            padding: '32px',
+                            maxWidth: '700px',
+                            width: '100%',
+                            maxHeight: '90vh',
+                            overflowY: 'auto',
+                            boxShadow: '0 20px 60px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(139, 92, 246, 0.1)',
+                            zIndex: 10006,
+                            position: 'relative',
+                          }}
+                        >
+                          <button
+                            onClick={() => setShowInvestmentTaxDetails(false)}
+                            style={{
+                              position: 'absolute',
+                              top: '20px',
+                              right: '20px',
+                              background: 'rgba(255, 255, 255, 0.1)',
+                              border: '1px solid rgba(255, 255, 255, 0.15)',
+                              borderRadius: '50%',
+                              width: '32px',
+                              height: '32px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              cursor: 'pointer',
+                              color: 'rgba(255, 255, 255, 0.8)',
+                              fontSize: '18px',
+                              transition: 'all 0.2s ease',
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)';
+                              e.currentTarget.style.borderColor = 'rgba(139, 92, 246, 0.5)';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
+                              e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.15)';
+                            }}
+                          >
+                            ×
+                          </button>
+                          <div style={{ marginBottom: '24px', paddingRight: '40px' }}>
+                            <h3 style={{
+                              margin: '0 0 8px 0',
+                              fontSize: '24px',
+                              fontWeight: 600,
+                              color: 'rgba(255, 255, 255, 0.95)',
+                              background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(139, 92, 246, 0.9) 100%)',
+                              WebkitBackgroundClip: 'text',
+                              WebkitTextFillColor: 'transparent',
+                              backgroundClip: 'text',
+                            }}>
+                              Investment & Tax Details
+                            </h3>
+                            <p style={{
+                              margin: 0,
+                              fontSize: '14px',
+                              color: 'rgba(255, 255, 255, 0.65)',
+                              lineHeight: '1.5',
+                            }}>
+                              Configure investment returns and tax settings for opportunity cost calculations.
+                            </p>
+                          </div>
+                          <div style={{
+                            display: 'grid',
+                            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                            gap: '16px',
+                          }}>
+                            <div style={{
+                              border: '1px solid rgba(255, 255, 255, 0.1)',
+                              borderRadius: '12px',
+                              padding: '16px',
+                              background: 'rgba(255, 255, 255, 0.03)',
+                              transition: 'all 0.2s ease',
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.borderColor = 'rgba(139, 92, 246, 0.4)';
+                              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)';
+                              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.03)';
+                            }}
+                            >
+                              <div style={{
+                                fontSize: '12px',
+                                color: 'rgba(255, 255, 255, 0.65)',
+                                marginBottom: '8px',
+                                fontWeight: 500,
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.5px',
+                              }}>
+                                Investment Return Rate
+                              </div>
+                              <input
+                                type="number"
+                                step="0.1"
+                                value={(getAdvancedValue('investmentReturnRate') as number) || 7}
+                                onChange={(e) => handleAdvancedFieldChange('investmentReturnRate', Number(e.target.value))}
+                                style={{
+                                  width: '100%',
+                                  borderRadius: '8px',
+                                  border: '1px solid rgba(255, 255, 255, 0.15)',
+                                  background: 'rgba(255, 255, 255, 0.08)',
+                                  color: 'rgba(255, 255, 255, 0.95)',
+                                  padding: '10px 12px',
+                                  fontSize: '15px',
+                                  fontWeight: 600,
+                                  outline: 'none',
+                                  transition: 'all 0.2s ease',
+                                }}
+                                onFocus={(e) => {
+                                  e.target.style.borderColor = 'rgba(139, 92, 246, 0.6)';
+                                  e.target.style.background = 'rgba(255, 255, 255, 0.12)';
+                                }}
+                                onBlur={(e) => {
+                                  e.target.style.borderColor = 'rgba(255, 255, 255, 0.15)';
+                                  e.target.style.background = 'rgba(255, 255, 255, 0.08)';
+                                }}
+                              />
+                              <div style={{
+                                fontSize: '11px',
+                                color: 'rgba(255, 255, 255, 0.5)',
+                                marginTop: '4px',
+                              }}>
+                                annual %
+                              </div>
+                            </div>
+
+                            {/* Federal Tax Rate */}
+                            <div style={{
+                              border: '1px solid rgba(255, 255, 255, 0.1)',
+                              borderRadius: '12px',
+                              padding: '16px',
+                              background: 'rgba(255, 255, 255, 0.03)',
+                              transition: 'all 0.2s ease',
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.borderColor = 'rgba(139, 92, 246, 0.4)';
+                              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)';
+                              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.03)';
+                            }}
+                            >
+                              <div style={{
+                                fontSize: '12px',
+                                color: 'rgba(255, 255, 255, 0.65)',
+                                marginBottom: '8px',
+                                fontWeight: 500,
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.5px',
+                              }}>
+                                Federal Tax Rate
+                              </div>
+                              <input
+                                type="number"
+                                step="0.1"
+                                value={(getAdvancedValue('federalTaxRate') as number) ?? 22}
+                                onChange={(e) => handleAdvancedFieldChange('federalTaxRate', Number(e.target.value))}
+                                style={{
+                                  width: '100%',
+                                  borderRadius: '8px',
+                                  border: '1px solid rgba(255, 255, 255, 0.15)',
+                                  background: 'rgba(255, 255, 255, 0.08)',
+                                  color: 'rgba(255, 255, 255, 0.95)',
+                                  padding: '10px 12px',
+                                  fontSize: '15px',
+                                  fontWeight: 600,
+                                  outline: 'none',
+                                  transition: 'all 0.2s ease',
+                                }}
+                                onFocus={(e) => {
+                                  e.target.style.borderColor = 'rgba(139, 92, 246, 0.6)';
+                                  e.target.style.background = 'rgba(255, 255, 255, 0.12)';
+                                }}
+                                onBlur={(e) => {
+                                  e.target.style.borderColor = 'rgba(255, 255, 255, 0.15)';
+                                  e.target.style.background = 'rgba(255, 255, 255, 0.08)';
+                                }}
+                              />
+                              <div style={{
+                                fontSize: '11px',
+                                color: 'rgba(255, 255, 255, 0.5)',
+                                marginTop: '4px',
+                              }}>
+                                %
+                              </div>
+                            </div>
+
+                            {/* State Tax Rate */}
+                            <div style={{
+                              border: '1px solid rgba(255, 255, 255, 0.1)',
+                              borderRadius: '12px',
+                              padding: '16px',
+                              background: 'rgba(255, 255, 255, 0.03)',
+                              transition: 'all 0.2s ease',
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.borderColor = 'rgba(139, 92, 246, 0.4)';
+                              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)';
+                              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.03)';
+                            }}
+                            >
+                              <div style={{
+                                fontSize: '12px',
+                                color: 'rgba(255, 255, 255, 0.65)',
+                                marginBottom: '8px',
+                                fontWeight: 500,
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.5px',
+                              }}>
+                                State Tax Rate
+                              </div>
+                              <input
+                                type="number"
+                                step="0.1"
+                                value={(getAdvancedValue('stateTaxRate') as number) ?? 5}
+                                onChange={(e) => handleAdvancedFieldChange('stateTaxRate', Number(e.target.value))}
+                                style={{
+                                  width: '100%',
+                                  borderRadius: '8px',
+                                  border: '1px solid rgba(255, 255, 255, 0.15)',
+                                  background: 'rgba(255, 255, 255, 0.08)',
+                                  color: 'rgba(255, 255, 255, 0.95)',
+                                  padding: '10px 12px',
+                                  fontSize: '15px',
+                                  fontWeight: 600,
+                                  outline: 'none',
+                                  transition: 'all 0.2s ease',
+                                }}
+                                onFocus={(e) => {
+                                  e.target.style.borderColor = 'rgba(139, 92, 246, 0.6)';
+                                  e.target.style.background = 'rgba(255, 255, 255, 0.12)';
+                                }}
+                                onBlur={(e) => {
+                                  e.target.style.borderColor = 'rgba(255, 255, 255, 0.15)';
+                                  e.target.style.background = 'rgba(255, 255, 255, 0.08)';
+                                }}
+                              />
+                              <div style={{
+                                fontSize: '11px',
+                                color: 'rgba(255, 255, 255, 0.5)',
+                                marginTop: '4px',
+                              }}>
+                                %
+                              </div>
+                            </div>
+
+                            {/* Tax Filing Status */}
+                            <div style={{
+                              border: '1px solid rgba(255, 255, 255, 0.1)',
+                              borderRadius: '12px',
+                              padding: '16px',
+                              background: 'rgba(255, 255, 255, 0.03)',
+                              transition: 'all 0.2s ease',
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.borderColor = 'rgba(139, 92, 246, 0.4)';
+                              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)';
+                              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.03)';
+                            }}
+                            >
+                              <div style={{
+                                fontSize: '12px',
+                                color: 'rgba(255, 255, 255, 0.65)',
+                                marginBottom: '8px',
+                                fontWeight: 500,
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.5px',
+                              }}>
+                                Tax Filing Status
+                              </div>
+                              <select
+                                value={(getAdvancedValue('taxFilingStatus') as string) || 'single'}
+                                onChange={(e) => handleAdvancedFieldChange('taxFilingStatus', e.target.value)}
+                                style={{
+                                  width: '100%',
+                                  borderRadius: '8px',
+                                  border: '1px solid rgba(255, 255, 255, 0.15)',
+                                  background: 'rgba(255, 255, 255, 0.08)',
+                                  color: 'rgba(255, 255, 255, 0.95)',
+                                  padding: '10px 12px',
+                                  fontSize: '15px',
+                                  fontWeight: 600,
+                                  outline: 'none',
+                                  transition: 'all 0.2s ease',
+                                  cursor: 'pointer',
+                                }}
+                                onFocus={(e) => {
+                                  e.target.style.borderColor = 'rgba(139, 92, 246, 0.6)';
+                                  e.target.style.background = 'rgba(255, 255, 255, 0.12)';
+                                }}
+                                onBlur={(e) => {
+                                  e.target.style.borderColor = 'rgba(255, 255, 255, 0.15)';
+                                  e.target.style.background = 'rgba(255, 255, 255, 0.08)';
+                                }}
+                              >
+                                <option value="single" style={{ background: '#1a1d29', color: 'white' }}>Single</option>
+                                <option value="married_joint" style={{ background: '#1a1d29', color: 'white' }}>Married Filing Jointly</option>
+                                <option value="married_separate" style={{ background: '#1a1d29', color: 'white' }}>Married Filing Separately</option>
+                                <option value="head_of_household" style={{ background: '#1a1d29', color: 'white' }}>Head of Household</option>
+                              </select>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </>,
+                    document.body
+                  )}
+                  {!isLocationEditMode && (
+                    <p style={locationFooterStyle}>
+                      Want to compare a different neighborhood? Just mention another ZIP or city in the chat.
+                    </p>
+                  )}
                 </>
               ) : (
                 <p style={locationDescriptionStyle}>
-                  Tell me a ZIP code like “95125” or say “Analyze Austin” and I’ll pull the local prices, rents, taxes, and growth
+                  Tell me a ZIP code like "95125" or say "Analyze Austin" and I'll pull the local prices, rents, taxes, and growth
                   rates for you.
                 </p>
               )}
             </section>
 
-            <BasicInputsCard
-              values={basicValues}
-              editingValues={editableValues ?? basicValues}
-              isEditMode={isEditMode}
-              onFieldChange={handleBasicFieldChange}
-              onEdit={handleEditValues}
-              onSave={handleSaveEdit}
-              onCancel={handleCancelEdit}
-            />
-
-            <AdvancedInputsCard
-              values={advancedInputs}
-              editingValues={editableAdvancedValues ?? advancedInputs}
-              isEditMode={isEditMode}
-              isExpanded={showAdvancedAssumptions}
-              onToggle={() => setShowAdvancedAssumptions(prev => !prev)}
-              onFieldChange={handleAdvancedFieldChange}
-            />
           </div>
         )}
 
         {/* Right Column: Chat Container */}
         <div className="rvb-right">
-          <div className="chat-container">
-      <div className="chat-header">
-        <h1 className="app-title">RentVsBuy.ai</h1>
-          <div className="header-buttons">
-            {/* Tab Buttons */}
-            <div className="tab-buttons">
-              <button
-                className={`tab-button ${activeTab === 'chat' ? 'active' : ''}`}
-                onClick={() => setActiveTab('chat')}
-                data-tour-id="chat-tab-button"
-              >
-                💬 Chat & Setup
-              </button>
-              <button
-                className={`tab-button ${activeTab === 'charts' ? 'active' : ''}`}
-                onClick={() => setActiveTab('charts')}
-                title="View the charts dashboard"
-                data-tour-id="charts-tab-button"
-              >
-                📊 Charts Dashboard
-              </button>
-            </div>
-            {activeTab === 'chat' && (
-              <>
+          {/* Chat-level actions (outside the main box) - Hidden, moved to banner */}
+          {activeTab === 'chat' && (
+            <div className="chat-actions-outside" style={{ display: 'none' }}>
                 <button 
                   className="save-button"
                   onClick={handleSaveChat}
@@ -3224,8 +5204,37 @@ const handleChipClick = (message: string) => {
                 >
                   Restart
                 </button>
-              </>
-            )}
+            </div>
+          )}
+          <div className="chat-container">
+      <div className="chat-header">
+        <h1 className="app-title">RentVsBuy.ai</h1>
+          <div className="header-buttons">
+            {/* Tab Buttons */}
+            <div className="tab-buttons">
+              <button
+                className={`tab-button ${activeTab === 'chat' ? 'active' : ''}`}
+                onClick={() => setActiveTab('chat')}
+                data-tour-id="chat-tab-button"
+              >
+                💬 Chat & Setup
+              </button>
+              <button
+                className={`tab-button ${activeTab === 'summary' ? 'active' : ''}`}
+                onClick={() => setActiveTab('summary')}
+                title="View summary"
+              >
+                📋 Summary
+              </button>
+              <button
+                className={`tab-button ${activeTab === 'charts' ? 'active' : ''}`}
+                onClick={() => setActiveTab('charts')}
+                title="View the charts dashboard"
+                data-tour-id="charts-tab-button"
+              >
+                📊 Charts Dashboard
+              </button>
+            </div>
             {/* Toggle Reference Box Button - Always visible */}
           </div>
       </div>
@@ -3261,8 +5270,6 @@ const handleChipClick = (message: string) => {
                   recommendation={message.recommendation}
                   location={message.recommendationLocation}
                   timeline={message.recommendationTimeline}
-                  onShowDetails={handleShowDetails}
-                  onTryNewScenario={handleTryNewScenario}
                 />
               )}
               {/* Render chart right after message if it has one - uses message's snapshot data */}
@@ -3278,6 +5285,92 @@ const handleChipClick = (message: string) => {
                   }}
                 >
                   {renderChart(message.chartToShow, message.snapshotData)}
+                </div>
+              )}
+              {/* Render action buttons if this message has the flag */}
+              {message.showActionButtons && (
+                <div className="action-buttons-container" style={{ marginTop: '20px', display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                  <button
+                    className="action-button action-button-summary"
+                    onClick={() => setActiveTab('summary')}
+                    style={{
+                      padding: '12px 24px',
+                      borderRadius: '12px',
+                      border: '1px solid rgba(139, 92, 246, 0.4)',
+                      background: 'rgba(139, 92, 246, 0.15)',
+                      color: 'rgba(196, 181, 253, 0.95)',
+                      cursor: 'pointer',
+                      fontSize: '14px',
+                      fontWeight: 500,
+                      transition: 'all 0.2s ease',
+                      flex: '1',
+                      minWidth: '150px'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = 'rgba(139, 92, 246, 0.25)';
+                      e.currentTarget.style.borderColor = 'rgba(139, 92, 246, 0.6)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = 'rgba(139, 92, 246, 0.15)';
+                      e.currentTarget.style.borderColor = 'rgba(139, 92, 246, 0.4)';
+                    }}
+                  >
+                    Go to Summary
+                  </button>
+                  <button
+                    className="action-button action-button-charts"
+                    onClick={() => setActiveTab('charts')}
+                    style={{
+                      padding: '12px 24px',
+                      borderRadius: '12px',
+                      border: '1px solid rgba(139, 92, 246, 0.4)',
+                      background: 'rgba(139, 92, 246, 0.15)',
+                      color: 'rgba(196, 181, 253, 0.95)',
+                      cursor: 'pointer',
+                      fontSize: '14px',
+                      fontWeight: 500,
+                      transition: 'all 0.2s ease',
+                      flex: '1',
+                      minWidth: '150px'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = 'rgba(139, 92, 246, 0.25)';
+                      e.currentTarget.style.borderColor = 'rgba(139, 92, 246, 0.6)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = 'rgba(139, 92, 246, 0.15)';
+                      e.currentTarget.style.borderColor = 'rgba(139, 92, 246, 0.4)';
+                    }}
+                  >
+                    Go to Charts Dashboard
+                  </button>
+                  <button
+                    className="action-button action-button-new-values"
+                    onClick={handleTryNewValues}
+                    style={{
+                      padding: '12px 24px',
+                      borderRadius: '12px',
+                      border: '1px solid rgba(148, 163, 184, 0.4)',
+                      background: 'rgba(148, 163, 184, 0.1)',
+                      color: 'rgba(226, 232, 240, 0.9)',
+                      cursor: 'pointer',
+                      fontSize: '14px',
+                      fontWeight: 500,
+                      transition: 'all 0.2s ease',
+                      flex: '1',
+                      minWidth: '150px'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = 'rgba(148, 163, 184, 0.2)';
+                      e.currentTarget.style.borderColor = 'rgba(148, 163, 184, 0.6)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = 'rgba(148, 163, 184, 0.1)';
+                      e.currentTarget.style.borderColor = 'rgba(148, 163, 184, 0.4)';
+                    }}
+                  >
+                    Try New Numbers
+                  </button>
                 </div>
               )}
             </div>
@@ -3333,34 +5426,13 @@ const handleChipClick = (message: string) => {
         <span>Built with AI-powered insights</span>
       </div>
         </>
-      ) : (
+      ) : activeTab === 'charts' ? (
         <div className="charts-tab-container">
           <div className="charts-grid-wrapper">
             <div className="charts-panel">
               <ChartsGrid
                 snapshotData={messages.find(m => m.snapshotData)?.snapshotData || null}
-                timeline={unifiedAnalysisResult?.timeline?.map(p => ({
-                  monthIndex: (p as any).month_index ?? p.monthIndex ?? 0,
-                  year: (p as any).year ?? Math.ceil(((p as any).month_index ?? p.monthIndex ?? 0) / 12),
-                  netWorthBuy: (p as any).net_worth_buy ?? p.netWorthBuy ?? 0,
-                  netWorthRent: (p as any).net_worth_rent ?? p.netWorthRent ?? 0,
-                  totalCostBuyToDate: (p as any).total_cost_buy_to_date ?? p.totalCostBuyToDate ?? 0,
-                  totalCostRentToDate: (p as any).total_cost_rent_to_date ?? p.totalCostRentToDate ?? 0,
-                  buyMonthlyOutflow: (p as any).buy_monthly_outflow ?? p.buyMonthlyOutflow ?? 0,
-                  rentMonthlyOutflow: (p as any).rent_monthly_outflow ?? p.rentMonthlyOutflow ?? 0,
-                  mortgagePayment: (p as any).mortgage_payment ?? p.mortgagePayment ?? 0,
-                  propertyTaxMonthly: (p as any).property_tax_monthly ?? p.propertyTaxMonthly ?? 0,
-                  insuranceMonthly: (p as any).insurance_monthly ?? p.insuranceMonthly ?? 0,
-                  maintenanceMonthly: (p as any).maintenance_monthly ?? p.maintenanceMonthly ?? 0,
-                  hoaMonthly: (p as any).hoa_monthly ?? p.hoaMonthly ?? 0,
-                  principalPaid: (p as any).principal_paid ?? p.principalPaid ?? 0,
-                  interestPaid: (p as any).interest_paid ?? p.interestPaid ?? 0,
-                  remainingBalance: (p as any).remaining_balance ?? p.remainingBalance ?? 0,
-                  homeValue: (p as any).home_value ?? p.homeValue ?? 0,
-                  homeEquity: (p as any).home_equity ?? p.homeEquity ?? 0,
-                  renterInvestmentBalance: (p as any).renter_investment_balance ?? p.renterInvestmentBalance ?? 0,
-                  buyerCashAccount: (p as any).buyer_cash_account ?? p.buyerCashAccount ?? 0,
-                })) || undefined}
+                timeline={normalizedTimeline}
                 data={chartData || undefined}
                 monthlyCosts={monthlyCosts || undefined}
                 totalCostData={totalCostData || undefined}
@@ -3378,6 +5450,11 @@ const handleChipClick = (message: string) => {
             </div>
           </div>
         </div>
+      ) : (
+        <SummaryTab
+          analysis={unifiedAnalysisResult}
+          zipCode={currentZipCode}
+        />
       )}
           </div>
         </div>
@@ -3402,120 +5479,6 @@ const handleChipClick = (message: string) => {
               {monteCarloProgressStage || 'Generating random price paths...'}
             </p>
           </div>
-        )}
-        
-        {/* Chart Navigation Buttons - Only visible in Chat & Setup tab */}
-        {activeTab === 'chat' && (
-        <div 
-          className={`chart-nav-bar ${hasResults ? 'rvb-fade-in' : ''}`} 
-          data-tour-id="charts-area"
-          style={{ 
-            opacity: chartsReady ? 1 : 0.6,
-            pointerEvents: chartsReady ? 'auto' : 'none'
-          }}
-        >
-          {!chartsReady ? (
-            <>
-              <div style={{ padding: '20px', textAlign: 'center', color: 'rgba(255, 255, 255, 0.7)' }}>
-                <span className="chart-nav-label">📊 Charts:</span>
-                <span style={{ marginLeft: '12px', fontSize: '14px' }}>Charts will appear here after you complete your scenario.</span>
-              </div>
-              {/* Advanced Analysis Section - Always visible for tour, even when charts not ready */}
-              <div className="rvb-advanced-section" style={{ marginTop: '16px' }}>
-                <button
-                  className="rvb-advanced-toggle"
-                  onClick={() => chartsReady && setShowAdvancedCharts(prev => !prev)}
-                  data-tour-id="advanced-charts-toggle"
-                  style={{ 
-                    opacity: 0.6,
-                    pointerEvents: 'none',
-                    cursor: 'default'
-                  }}
-                >
-                  Advanced Analysis (for experts)
-                  <span className="rvb-advanced-toggle-indicator">
-                    ▸
-                  </span>
-                </button>
-              </div>
-            </>
-          ) : (
-            <>
-          <span className="chart-nav-label">📊 Charts:</span>
-          
-          <div className="rvb-chart-sections">
-            {/* Core Charts Section */}
-            <div>
-              <div className="rvb-core-charts-header">Core charts</div>
-              <div className="chart-button-grid core-charts">
-                {BASIC_CHART_KEYS.map(chartKey => {
-                  const config = chartButtonConfig[chartKey];
-                  return (
-                    <button
-                      key={chartKey}
-                      className="chart-button"
-                      onClick={() => handleChipClick(config.message)}
-                      title={config.title}
-                    >
-                      <span className="button-icon">{config.label.split(' ')[0]}</span>
-                      <span className="button-text">
-                        <strong>{config.label.substring(config.label.indexOf(' ') + 1)}</strong>
-                        <small>{config.description}</small>
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-            
-            {/* Advanced Analysis Section (Collapsible) */}
-            <div className="rvb-advanced-section">
-              <button
-                className="toggle-button"
-                onClick={() => setShowAdvancedCharts(prev => !prev)}
-                data-tour-id="advanced-charts-toggle"
-              >
-                <span>{showAdvancedCharts ? '▼' : '▶'}</span>
-                Advanced Analysis
-                <small>Market risk, sensitivity, tax implications</small>
-              </button>
-              
-              {showAdvancedCharts && (
-                <div className="rvb-advanced-chips">
-                  <p style={{ 
-                    fontSize: '11px', 
-                    color: 'rgba(255, 255, 255, 0.7)', 
-                    margin: '0 0 8px 0',
-                    lineHeight: '1.4'
-                  }}>
-                    These charts show risk, volatility, break-even points, and more detailed scenarios. You don't need them to understand the basics, but they're here if you want to go deeper.
-                  </p>
-                  <div className="chart-button-grid advanced-charts">
-                    {ADVANCED_CHART_KEYS.map(chartKey => {
-                      const config = chartButtonConfig[chartKey];
-                      return (
-                        <button
-                          key={chartKey}
-                          className="chart-button"
-                          onClick={() => handleChipClick(config.message)}
-                          title={config.title}
-                        >
-                          <span className="button-icon">{config.label.split(' ')[0]}</span>
-                          <span className="button-text">
-                            <strong>{config.label.substring(config.label.indexOf(' ') + 1)}</strong>
-                            <small>{config.description}</small>
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-            </>
-          )}
-        </div>
         )}
       </div>
       
@@ -3577,6 +5540,32 @@ const handleChipClick = (message: string) => {
               </div>
             <p className="progress-label">Generating PDF...</p>
           </div>
+        </div>
+      )}
+
+      {/* Hidden export-only chart container */}
+      {showExportChart && exportChartData && (
+        <div
+          ref={exportRef}
+          id="chart-export-container"
+          data-export-container
+          style={{
+            position: 'fixed',
+            left: '-2000px',
+            top: '-2000px',
+            width: '1400px',
+            minHeight: '600px',
+            padding: '32px',
+            background: '#ffffff',
+            borderRadius: '16px',
+            opacity: 1,
+            filter: 'none',
+            zIndex: -9999,
+            visibility: 'visible',
+            display: 'block',
+          }}
+        >
+          {renderChart(exportChartData.chartType, exportChartData.snapshotData, true)}
         </div>
       )}
     </div>
@@ -3675,7 +5664,8 @@ function buildLocalAnalysis(inputs: ScenarioInputs): CalculatorOutput {
   // Buyer cash account: starts negative (money spent on down payment + closing), then tracks cash flow
   // Renter investment balance: already in MonthlySnapshot as investedDownPayment
   const downPaymentAmount = inputs.homePrice * (inputs.downPaymentPercent / 100);
-  const closingCostsBuy = inputs.homePrice * 0.03; // 3% closing costs
+  const closingCostsPercent = inputs.closingCostsPercent ?? 3.0;
+  const closingCostsBuy = inputs.homePrice * (closingCostsPercent / 100);
   const monthlyInvestmentReturn = inputs.investmentReturnRate / 100 / 12;
   
   // Start with negative cash (money spent upfront)
@@ -3760,18 +5750,23 @@ Extract financial data from this user message: "${message}"
 Look for and extract:
 1. Home price: Any large number (like 400000, 500k, $500,000) that could be a home price
 2. Monthly rent: Any number that could be monthly rent (like 2500, 2.5k, $2,500)
-3. Down payment percentage: Any number with % or "percent" (like 20%, 15 percent)
+3. Down payment: Can be EITHER:
+   - A percentage with % or "percent" (like 20%, 15 percent) - return as number (e.g., 20)
+   - A dollar amount (like 100k, $100k, $100,000, 100000) - return as number in dollars (e.g., 100000)
+   Note: If dollar amount is provided, the system will calculate the percentage automatically
 4. Timeline in years: Any number with time-related words (year, yr, yrs, stay, plan, timeline)
 
 Return ONLY a JSON object with this exact format:
 {
   "homePrice": number or null,
   "monthlyRent": number or null, 
-  "downPaymentPercent": number or null,
+  "downPaymentPercent": number or null (if percentage provided),
+  "downPaymentAmount": number or null (if dollar amount provided instead of percentage),
   "timeHorizonYears": number or null
 }
 
 If you can't find a value, use null. Only extract numbers that make sense for each field.
+If down payment is given as a dollar amount (like "100k" or "$100,000"), put it in "downPaymentAmount" field, NOT "downPaymentPercent".
 `;
 
     const completion = await createChatCompletion(
@@ -3800,9 +5795,18 @@ If you can't find a value, use null. Only extract numbers that make sense for ea
     if (extractedData.monthlyRent && extractedData.monthlyRent > 0) {
       newData.monthlyRent = extractedData.monthlyRent;
     }
-    if (extractedData.downPaymentPercent && extractedData.downPaymentPercent > 0) {
+    
+    // Handle down payment: check for dollar amount first, then percentage
+    if (extractedData.downPaymentAmount && extractedData.downPaymentAmount > 0 && newData.homePrice) {
+      // Reverse calculate percentage from dollar amount
+      const calculatedPercent = (extractedData.downPaymentAmount / newData.homePrice) * 100;
+      if (calculatedPercent >= 3 && calculatedPercent <= 50) { // Reasonable range
+        newData.downPaymentPercent = Math.round(calculatedPercent * 100) / 100;
+      }
+    } else if (extractedData.downPaymentPercent && extractedData.downPaymentPercent > 0) {
       newData.downPaymentPercent = extractedData.downPaymentPercent;
     }
+    
     if (extractedData.timeHorizonYears && extractedData.timeHorizonYears > 0) {
       newData.timeHorizonYears = extractedData.timeHorizonYears;
     }
@@ -3852,9 +5856,74 @@ function buildAssumptionSentence(hint: AssumptionHint): string {
 }
 
 function enrichDownPaymentAndTimeline(message: string, data: UserData) {
+  // First check for percentage (takes priority)
   const percentMatch = message.match(/(\d+(?:\.\d+)?)\s*%/);
   if (percentMatch && !data.downPaymentPercent) {
     data.downPaymentPercent = parseFloat(percentMatch[1]);
+    return; // If we found a percentage, don't look for dollar amounts
+  }
+
+  // If no percentage found and we have a home price, check for dollar amount down payment
+  if (!data.downPaymentPercent && data.homePrice) {
+    // Match dollar amounts in various formats: "$100k", "100k", "$100,000", "100,000", "$100000", "100000"
+    // Look for patterns near "down payment" keywords or standalone dollar amounts that are reasonable for down payments
+    const lowerMessage = message.toLowerCase();
+    const hasDownPaymentContext = lowerMessage.includes('down') || lowerMessage.includes('down payment') || 
+                                   lowerMessage.includes('downpayment') || lowerMessage.includes('dp');
+    
+    // Pattern to match: optional $, number with optional commas, optional k/K suffix
+    // Try patterns with 'k' suffix first, then without
+    const patterns = [
+      /\$?\s*(\d{1,3}(?:,\d{3})*)\s*[kK]\b/g,  // "$100k" or "100k" (with k suffix)
+      /\$(\d{1,3}(?:,\d{3}){2,})\b/g,          // "$100,000" (with $ and commas)
+      /\b(\d{1,3}(?:,\d{3}){2,})\b/g           // "100,000" (just commas, 3+ digits)
+    ];
+    
+    for (const pattern of patterns) {
+      const matches = [...message.matchAll(pattern)];
+      
+      for (const match of matches) {
+        let amountStr = match[1].replace(/,/g, '');
+        const fullMatch = match[0].toLowerCase();
+        const hasK = fullMatch.includes('k');
+        
+        if (hasK) {
+          amountStr = (parseFloat(amountStr) * 1000).toString();
+        }
+        
+        const amount = parseFloat(amountStr);
+        
+        // Check if this amount is reasonable for a down payment (5k to 50% of home price)
+        // and either has down payment context or is in a reasonable range
+        const minDownPayment = 5000;
+        const maxDownPayment = data.homePrice * 0.5; // Max 50% down payment
+        
+        if (amount >= minDownPayment && amount <= maxDownPayment) {
+          // If it has down payment context, or if it's the only reasonable dollar amount in the message
+          // (not home price, not rent), use it
+          if (hasDownPaymentContext) {
+            // Reverse calculate percentage
+            const calculatedPercent = (amount / data.homePrice) * 100;
+            if (calculatedPercent >= 3 && calculatedPercent <= 50) { // Reasonable down payment range
+              data.downPaymentPercent = Math.round(calculatedPercent * 100) / 100; // Round to 2 decimals
+              return; // Found it, exit early
+            }
+          } else {
+            // If no explicit context but the amount is in a reasonable down payment range
+            // and we don't already have home price/rent set, it might be down payment
+            const calculatedPercent = (amount / data.homePrice) * 100;
+            if (calculatedPercent >= 5 && calculatedPercent <= 30) { // Typical down payment range
+              // Only use it if it's clearly not home price or rent
+              // (home price would be larger, rent would be smaller)
+              if (amount < data.homePrice * 0.1 && amount > 10000) {
+                data.downPaymentPercent = Math.round(calculatedPercent * 100) / 100;
+                return; // Found it, exit early
+              }
+            }
+          }
+        }
+      }
+    }
   }
 
   const yearsMatch = message.match(/(\d+(?:\.\d+)?)\s*(?:years?|yrs?|yr)/i);
@@ -3884,11 +5953,52 @@ function extractUserDataFallback(message: string, currentData: UserData, locatio
       newData.monthlyRent = numbers.find(n => n > 500 && n < 10000) || null;
     }
     
-    // Look for percentage
+    // Look for percentage first
     if (lowerMessage.includes('%')) {
       const percentMatch = message.match(/(\d+(?:\.\d+)?)\s*%/);
       if (percentMatch && !newData.downPaymentPercent) {
         newData.downPaymentPercent = parseFloat(percentMatch[1]);
+      }
+    }
+    
+    // If no percentage found and we have home price, check for dollar amount down payment
+    if (!newData.downPaymentPercent && newData.homePrice) {
+      // Look for dollar amounts that could be down payment (5k-50% of home price)
+      const dollarPatterns = [
+        /\$?\s*(\d{1,3}(?:,\d{3})*)\s*[kK]\b/g,  // "$100k" or "100k"
+        /\$(\d{1,3}(?:,\d{3})*)\b/g,              // "$100,000"
+        /\b(\d{1,3}(?:,\d{3}){2,})\b/g           // "100,000" (3+ digits with commas)
+      ];
+      
+      const hasDownPaymentContext = lowerMessage.includes('down') || lowerMessage.includes('dp');
+      
+      for (const pattern of dollarPatterns) {
+        const matches = [...message.matchAll(pattern)];
+        for (const match of matches) {
+          let amountStr = match[1].replace(/,/g, '');
+          const fullMatch = match[0].toLowerCase();
+          
+          // Check if it has 'k' suffix
+          if (fullMatch.includes('k')) {
+            amountStr = (parseFloat(amountStr) * 1000).toString();
+          }
+          
+          const amount = parseFloat(amountStr);
+          const minDownPayment = 5000;
+          const maxDownPayment = newData.homePrice * 0.5;
+          
+          if (amount >= minDownPayment && amount <= maxDownPayment) {
+            const calculatedPercent = (amount / newData.homePrice) * 100;
+            if (calculatedPercent >= 3 && calculatedPercent <= 50) {
+              // Use it if there's context, or if it's in typical range (5-30%)
+              if (hasDownPaymentContext || (calculatedPercent >= 5 && calculatedPercent <= 30)) {
+                newData.downPaymentPercent = Math.round(calculatedPercent * 100) / 100;
+                break;
+              }
+            }
+          }
+        }
+        if (newData.downPaymentPercent) break;
       }
     }
     
