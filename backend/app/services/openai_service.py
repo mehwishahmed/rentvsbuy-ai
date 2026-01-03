@@ -18,9 +18,16 @@ class OpenAIService:
         self._is_mock_mode = False
 
         if api_key:
-            self._client = OpenAI(api_key=api_key)
+            try:
+                self._client = OpenAI(api_key=api_key)
+                print(f"[OpenAIService] Client initialized successfully with API key (length: {len(api_key)})")
+            except Exception as e:
+                print(f"[OpenAIService] Error initializing OpenAI client: {e}")
+                # Fall back to mock mode if client creation fails
+                self._is_mock_mode = True
         else:
             # Fall back to a lightweight mock so the app still runs without a key
+            print("[OpenAIService] No API key found, using mock mode")
             self._is_mock_mode = True
 
     def _mock_response(self, messages: List[dict]) -> str:
@@ -43,20 +50,27 @@ class OpenAIService:
         )
 
     def chat_completion(self, model: str, messages: List[dict], temperature: float = 0.7, max_tokens: int = 200) -> str:
+        print(f"[OpenAIService.chat_completion] Called with mock_mode={self._is_mock_mode}, client={self._client is not None}")
         if self._is_mock_mode or self._client is None:
+            print(f"[OpenAIService.chat_completion] Returning mock response (mock_mode={self._is_mock_mode}, client=None={self._client is None})")
             return self._mock_response(messages)
 
         try:
+            print(f"[OpenAIService.chat_completion] Calling OpenAI API...")
             completion = self._client.chat.completions.create(
                 model=model,
                 messages=messages,
                 temperature=temperature,
                 max_tokens=max_tokens,
             )
-            return completion.choices[0].message.content or "I'm having trouble responding right now. Can you try again?"
+            response = completion.choices[0].message.content or "I'm having trouble responding right now. Can you try again?"
+            print(f"[OpenAIService.chat_completion] Success! Response length: {len(response)}")
+            return response
         except Exception as exc:  # broad fallback to keep the chat responsive
             # Fall back to mock response so the UI keeps working
-            print(f"[OpenAIService] Falling back to mock response due to error: {exc}")
+            print(f"[OpenAIService.chat_completion] Falling back to mock response due to error: {exc}")
+            import traceback
+            traceback.print_exc()
             return self._mock_response(messages)
 
     def chat_completion_stream(self, model: str, messages: List[dict], temperature: float = 0.7, max_tokens: int = 150) -> Iterator[str]:

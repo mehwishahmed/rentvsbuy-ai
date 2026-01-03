@@ -18,6 +18,9 @@ class Settings(BaseSettings):
             "http://127.0.0.1:5173",
             "http://localhost:5174",
             "http://127.0.0.1:5174",
+            "https://rvb-calc-ai-production-a1cd.up.railway.app",
+            "https://rentvsbuy.ai",           # Add this!
+            "https://www.rentvsbuy.ai",       # Add this!
         ]
     )
     openai_api_key: Optional[str] = Field(default=None, alias="OPENAI_API_KEY")

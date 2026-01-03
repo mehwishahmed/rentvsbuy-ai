@@ -25,6 +25,17 @@ settings = get_settings()
 
 app = FastAPI(title="Rent vs Buy AI Backend", version="0.1.0")
 
+@app.on_event("startup")
+async def startup_event():
+    """Log configuration status on startup."""
+    api_key_loaded = bool(settings.openai_api_key)
+    print(f"[Startup] OpenAI API key loaded: {api_key_loaded}")
+    if api_key_loaded:
+        print(f"[Startup] API key length: {len(settings.openai_api_key)}")
+        print(f"[Startup] API key starts with 'sk-': {settings.openai_api_key.startswith('sk-')}")
+    else:
+        print("[Startup] WARNING: OpenAI API key not found. AI features will use mock mode.")
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,
@@ -35,7 +46,7 @@ app.add_middleware(
 
 
 @app.get("/")
-def root() -> dict[str, str]:
+def root() -> dict:
     """Root endpoint - provides API information."""
     return {
         "service": "Rent vs Buy AI Backend",
@@ -60,6 +71,22 @@ def root() -> dict[str, str]:
 def health_check() -> dict[str, str]:
     return {"status": "ok"}
 
+@app.get("/debug/config")
+def debug_config() -> dict:
+    """Debug endpoint to check configuration status."""
+    from app.services.openai_service import OpenAIService
+    try:
+        service = OpenAIService()
+        return {
+            "api_key_loaded": bool(settings.openai_api_key),
+            "api_key_length": len(settings.openai_api_key) if settings.openai_api_key else 0,
+            "api_key_starts_with_sk": settings.openai_api_key.startswith("sk-") if settings.openai_api_key else False,
+            "service_mock_mode": service._is_mock_mode,
+            "service_client_exists": service._client is not None,
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
 
 class ChatMessage(BaseModel):
     role: Literal["user", "assistant", "system"]
@@ -75,7 +102,13 @@ class ChatRequest(BaseModel):
 
 def get_openai_service() -> OpenAIService:
     try:
-        return OpenAIService()
+        # Clear settings cache to ensure fresh API key
+        get_settings.cache_clear()
+        fresh_settings = get_settings()
+        print(f"[get_openai_service] API key present: {bool(fresh_settings.openai_api_key)}")
+        service = OpenAIService()
+        print(f"[get_openai_service] Service created - mock_mode: {service._is_mock_mode}, client_exists: {service._client is not None}")
+        return service
     except ValueError as exc:  # pragma: no cover - configuration issue
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
