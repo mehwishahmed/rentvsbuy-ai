@@ -1,0 +1,56 @@
+/* CLEAN LAYOUT CSS - For Summary and Charts Tabs */
+/* This will replace the messy CSS after layout approval */
+
+/* Summary Tab - Centered, max-width 1600px */
+.messages-container > .summary-wrapper {
+  width: 100%;
+  max-width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 0;
+  margin: 0;
+  box-sizing: border-box;
+}
+
+.messages-container > .summary-wrapper > * {
+  width: 100%;
+  max-width: 1600px;
+  margin: 0 auto;
+  box-sizing: border-box;
+}
+
+/* Charts Dashboard - Full width */
+.messages-container > .charts-wrapper {
+  width: 100%;
+  max-width: 100%;
+  display: block;
+  padding: 0;
+  margin: 0;
+  box-sizing: border-box;
+}
+
+.messages-container > .charts-wrapper > * {
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
+  box-sizing: border-box;
+}
+
+/* Messages container adjustments */
+.messages-container {
+  padding: 20px;
+  box-sizing: border-box;
+  overflow-x: auto; /* Allow horizontal scroll if needed at zoom */
+  overflow-y: auto;
+}
+
+/* Responsive - ensure it works at all sizes */
+@media (max-width: 1600px) {
+  .messages-container > .summary-wrapper > * {
+    max-width: calc(100% - 40px); /* Account for padding */
+  }
+}
+
+
+

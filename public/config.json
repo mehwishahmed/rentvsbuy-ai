@@ -1,4 +1,4 @@
 {
-  "backendUrl": "http://localhost:8000"
+  "backendUrl": "https://rvb-calc-ai-production-a1cd.up.railway.app"
 }
 

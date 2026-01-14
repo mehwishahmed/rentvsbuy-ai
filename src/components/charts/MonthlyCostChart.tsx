@@ -56,7 +56,7 @@ export function MonthlyCostChart({ timeline, isExport }: MonthlyCostChartProps) 
       <ResponsiveContainer width="100%" height={280}>
         <BarChart data={data}>
           <CartesianGrid strokeDasharray="3 3" stroke={colors.grid} />
-          <XAxis dataKey="name" stroke={colors.axis} tick={{ fill: colors.text }} />
+          <XAxis dataKey="name" stroke={colors.axis} tick={{ fill: colors.text, fontSize: 9 }} />
           <YAxis 
             tickFormatter={(value) => {
               if (value >= 1000000) {
@@ -67,13 +67,13 @@ export function MonthlyCostChart({ timeline, isExport }: MonthlyCostChartProps) 
               return `$${value}`;
             }}
             stroke={colors.axis}
-            tick={{ fill: colors.text }}
+            tick={{ fill: colors.text, fontSize: 9 }}
           />
           <Tooltip 
             formatter={(value: number) => `$${value.toLocaleString()}`}
-            contentStyle={{ backgroundColor: colors.tooltipBg, border: `1px solid ${colors.tooltipBorder}`, borderRadius: '10px', color: colors.tooltipText }}
+            contentStyle={{ backgroundColor: colors.tooltipBg, border: `1px solid ${colors.tooltipBorder}`, borderRadius: '10px', color: colors.tooltipText, fontSize: 11 }}
           />
-          <Legend wrapperStyle={{ color: colors.text }} />
+          <Legend wrapperStyle={{ color: colors.text, fontSize: 10 }} />
           <Bar dataKey="total" name="Monthly Cost" radius={[8, 8, 0, 0]}>
             {data.map((entry, index) => (
               <Cell key={`cell-${index}`} fill={entry.color} />

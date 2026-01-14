@@ -63,12 +63,12 @@ export function TotalCostChart({ analysis, isExport }: TotalCostChartProps) {
         This shows the total money you spend over time if you buy versus rent. Lower is better.
       </p>
       
-      <ResponsiveContainer width="100%" height={300}>
+      <ResponsiveContainer width="100%" height={280}>
         <BarChart data={data} margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
           <CartesianGrid strokeDasharray="3 3" stroke={colors.grid} />
-          <XAxis dataKey="name" stroke={colors.axis} tick={{ fill: colors.text }} />
+          <XAxis dataKey="name" stroke={colors.axis} tick={{ fill: colors.text, fontSize: 9 }} />
           <YAxis 
-            label={{ value: 'Net Cost ($)', angle: -90, position: 'insideLeft' }}
+            label={{ value: 'Net Cost ($)', angle: -90, position: 'insideLeft', fontSize: 10 }}
             tickFormatter={(value) => {
               if (Math.abs(value) >= 1000000) {
                 return `$${(value / 1000000).toFixed(1)}M`;
@@ -78,13 +78,13 @@ export function TotalCostChart({ analysis, isExport }: TotalCostChartProps) {
               return `$${value}`;
             }}
             stroke={colors.axis}
-            tick={{ fill: colors.text }}
+            tick={{ fill: colors.text, fontSize: 9 }}
           />
           <Tooltip 
             formatter={(value: number) => `$${value.toLocaleString()}`}
-            contentStyle={{ backgroundColor: colors.tooltipBg, border: `1px solid ${colors.tooltipBorder}`, borderRadius: '10px', color: colors.tooltipText }}
+            contentStyle={{ backgroundColor: colors.tooltipBg, border: `1px solid ${colors.tooltipBorder}`, borderRadius: '10px', color: colors.tooltipText, fontSize: 11 }}
           />
-          <Legend wrapperStyle={{ color: colors.text }} />
+          <Legend wrapperStyle={{ color: colors.text, fontSize: 10 }} />
           <Bar dataKey="netCost" name={`Net Cost (after ${timelineYears} years)`} radius={[8, 8, 0, 0]}>
             <Cell fill={colors.bar1} />
             <Cell fill={colors.bar2} />

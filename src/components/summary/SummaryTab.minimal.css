@@ -1,0 +1,10 @@
+/* MINIMAL CSS - Clean layout for Summary Tab */
+/* Mirrors Chat & Setup tab structure - no extra wrappers */
+
+.summary-tab-minimal {
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}

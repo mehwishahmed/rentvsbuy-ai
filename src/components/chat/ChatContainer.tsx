@@ -3420,11 +3420,12 @@ const handleChipClick = (message: string) => {
       label: 'Home appreciation',
       value: displayHomeGrowth !== null ? `${displayHomeGrowth.toFixed(2)}%/yr` : 'Pending',
     },
-    {
-      label: 'Rent growth',
-      value: displayRentGrowth !== null ? `${displayRentGrowth.toFixed(2)}%/yr` : 'Pending',
-    },
   ];
+
+  const rentGrowthMetric = {
+    label: 'Rent growth',
+    value: displayRentGrowth !== null ? `${displayRentGrowth.toFixed(2)}%/yr` : 'Pending',
+  };
 
   const locationCardStyle = {
     background: 'rgba(12, 16, 27, 0.85)',
@@ -3488,11 +3489,111 @@ const handleChipClick = (message: string) => {
     color: 'rgba(255,255,255,0.55)',
   };
 
+  // Render Charts Tab - completely independent layout
+  if (activeTab === 'charts') {
+    return (
+      <div className="charts-tab-layout">
+        <OnboardingTour activeTab={activeTab} />
+        <div className="charts-tab-header">
+          <h1 className="app-title">RentVsBuy.ai</h1>
+          <div className="header-buttons">
+            <div className="tab-buttons">
+              <button className="tab-button" onClick={() => setActiveTab('chat')}>
+                💬 Chat & Setup
+              </button>
+              <button className="tab-button" onClick={() => setActiveTab('summary')}>
+                📋 Summary
+              </button>
+              <button className="tab-button active" onClick={() => setActiveTab('charts')}>
+                📊 Charts Dashboard
+              </button>
+            </div>
+          </div>
+        </div>
+        <div className="charts-tab-content">
+          <ChartsGrid
+            snapshotData={messages.find(m => m.snapshotData)?.snapshotData || null}
+            timeline={normalizedTimeline}
+            data={chartData || undefined}
+            monthlyCosts={monthlyCosts || undefined}
+            totalCostData={totalCostData || undefined}
+            advancedMetrics={advancedMetrics}
+            heatmapData={heatmapData || undefined}
+            monteCarloData={monteCarloData || undefined}
+            sensitivityData={sensitivityData || undefined}
+            scenarioOverlayData={scenarioOverlayData || undefined}
+            chartsReady={chartsReady}
+            chartLoading={chartLoading}
+            userData={userData}
+            unifiedAnalysisResult={unifiedAnalysisResult}
+            adjustedAssumptions={adjustedAssumptions ?? undefined}
+          />
+        </div>
+        <div className="charts-tab-footer">
+          <span>RentVsBuy.ai v1.0</span>
+          <span>•</span>
+          <span>Built with AI-powered insights</span>
+        </div>
+      </div>
+    );
+  }
+
+  // Render Summary Tab - completely independent layout
+  if (activeTab === 'summary') {
+    return (
+      <div className="summary-tab-layout">
+        <OnboardingTour activeTab={activeTab} />
+        <div className="summary-tab-header">
+          <h1 className="app-title">RentVsBuy.ai</h1>
+          <div className="header-buttons">
+            <div className="tab-buttons">
+              <button className="tab-button" onClick={() => setActiveTab('chat')}>
+                💬 Chat & Setup
+              </button>
+              <button className="tab-button active" onClick={() => setActiveTab('summary')}>
+                📋 Summary
+              </button>
+              <button className="tab-button" onClick={() => setActiveTab('charts')}>
+                📊 Charts Dashboard
+              </button>
+            </div>
+          </div>
+        </div>
+        <div className="summary-tab-content">
+          <SummaryTab
+            analysis={unifiedAnalysisResult}
+            zipCode={currentZipCode}
+          />
+        </div>
+        <div className="summary-tab-footer">
+          <span>RentVsBuy.ai v1.0</span>
+          <span>•</span>
+          <span>Built with AI-powered insights</span>
+        </div>
+      </div>
+    );
+  }
+
+  // Render Chat Tab - uses layout structure with header (matching Summary/Charts)
   return (
     <div className="rvb-layout">
       <OnboardingTour activeTab={activeTab} />
-      {/* Step Indicator */}
-
+      <div className="chat-tab-header">
+        <h1 className="app-title">RentVsBuy.ai</h1>
+        <div className="header-buttons">
+          <div className="tab-buttons">
+            <button className="tab-button active" onClick={() => setActiveTab('chat')}>
+              💬 Chat & Setup
+            </button>
+            <button className="tab-button" onClick={() => setActiveTab('summary')}>
+              📋 Summary
+            </button>
+            <button className="tab-button" onClick={() => setActiveTab('charts')}>
+              📊 Charts Dashboard
+            </button>
+          </div>
+        </div>
+      </div>
       <div className="rvb-main">
         {/* Left Column: Inputs (Chat tab only) */}
         {activeTab === 'chat' && (
@@ -3642,21 +3743,27 @@ const handleChipClick = (message: string) => {
                       ))
                     )}
                   </div>
-                  <div style={{ display: 'flex', gap: '12px', marginTop: '16px' }}>
+                  
+                  {/* Rent Growth + Edit Market Data row */}
+                  <div style={{ display: 'flex', gap: '12px', marginTop: '12px' }}>
+                    <div style={{ ...metricItemStyle, flex: 1 }}>
+                      <span style={metricLabelStyle}>{rentGrowthMetric.label}: </span>
+                      <span style={metricValueStyle}>{rentGrowthMetric.value}</span>
+                    </div>
                     {isLocationEditMode ? (
-                      <>
+                      <div style={{ display: 'flex', gap: '8px', flex: 1 }}>
                         <button
                           onClick={handleSaveLocationEdit}
                           style={{
                             flex: 1,
-                            padding: '10px 12px',
-                            borderRadius: '8px',
+                            padding: '8px 12px',
+                            borderRadius: '6px',
                             border: 'none',
                             background: 'rgba(255, 255, 255, 0.1)',
                             color: 'rgba(255, 255, 255, 0.9)',
                             cursor: 'pointer',
                             fontWeight: 500,
-                            fontSize: '14px',
+                            fontSize: '12px',
                           }}
                         >
                           Save
@@ -3665,130 +3772,134 @@ const handleChipClick = (message: string) => {
                           onClick={handleCancelLocationEdit}
                           style={{
                             flex: 1,
-                            padding: '10px 12px',
-                            borderRadius: '8px',
+                            padding: '8px 12px',
+                            borderRadius: '6px',
                             border: '1px solid rgba(255, 255, 255, 0.1)',
                             background: 'rgba(255, 255, 255, 0.05)',
                             color: 'rgba(255, 255, 255, 0.7)',
                             cursor: 'pointer',
                             fontWeight: 500,
-                            fontSize: '14px',
+                            fontSize: '12px',
                           }}
                         >
                           Cancel
                         </button>
-                      </>
+                      </div>
                     ) : (
-                      <>
-                        <button
-                          onClick={handleEditLocation}
-                          style={{
-                            flex: 1,
-                            padding: '10px 12px',
-                            borderRadius: '8px',
-                            border: '1px solid rgba(255, 255, 255, 0.1)',
-                            background: 'rgba(255, 255, 255, 0.1)',
-                            color: 'rgba(255, 255, 255, 0.9)',
-                            cursor: 'pointer',
-                            fontWeight: 500,
-                            fontSize: '14px',
-                          }}
-                        >
-                          Edit Market Data
-                        </button>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', flex: 1 }}>
-                          <button
-                            onClick={() => setShowHomePurchaseDetails(!showHomePurchaseDetails)}
-                            style={{
-                              width: '100%',
-                              padding: '10px 12px',
-                              borderRadius: '8px',
-                              border: '1px solid rgba(255, 255, 255, 0.1)',
-                              background: showHomePurchaseDetails ? 'rgba(255, 255, 255, 0.15)' : 'rgba(255, 255, 255, 0.05)',
-                              color: 'rgba(255, 255, 255, 0.9)',
-                              cursor: 'pointer',
-                              fontWeight: 500,
-                              fontSize: '13px',
-                            }}
-                          >
-                            🏠 Home Purchase/Rent
-                          </button>
-                          <button
-                            onClick={() => setShowRentDetails(!showRentDetails)}
-                            style={{
-                              width: '100%',
-                              padding: '10px 12px',
-                              borderRadius: '8px',
-                              border: '1px solid rgba(255, 255, 255, 0.1)',
-                              background: showRentDetails ? 'rgba(255, 255, 255, 0.15)' : 'rgba(255, 255, 255, 0.05)',
-                              color: 'rgba(255, 255, 255, 0.9)',
-                              cursor: 'pointer',
-                              fontWeight: 500,
-                              fontSize: '13px',
-                            }}
-                          >
-                            💳 Loan Details
-                          </button>
-                          <button
-                            onClick={() => setShowInvestmentTaxDetails(!showInvestmentTaxDetails)}
-                            style={{
-                              width: '100%',
-                              padding: '10px 12px',
-                              borderRadius: '8px',
-                              border: '1px solid rgba(255, 255, 255, 0.1)',
-                              background: showInvestmentTaxDetails ? 'rgba(255, 255, 255, 0.15)' : 'rgba(255, 255, 255, 0.05)',
-                              color: 'rgba(255, 255, 255, 0.9)',
-                              cursor: 'pointer',
-                              fontWeight: 500,
-                              fontSize: '13px',
-                            }}
-                          >
-                            💰 Investment & Tax
-                          </button>
-                        </div>
-                        {/* Recalculate Button - Show when inputs have changed */}
-                        {hasInputsChanged() && (
-                          <button
-                            onClick={handleRecalculate}
-                            disabled={isAnalyzing}
-                            style={{
-                              width: '100%',
-                              padding: '12px 16px',
-                              borderRadius: '8px',
-                              border: 'none',
-                              background: isAnalyzing 
-                                ? 'rgba(139, 92, 246, 0.3)' 
-                                : 'linear-gradient(135deg, rgba(139, 92, 246, 0.8) 0%, rgba(99, 102, 241, 0.8) 100%)',
-                              color: 'rgba(255, 255, 255, 0.95)',
-                              cursor: isAnalyzing ? 'not-allowed' : 'pointer',
-                              fontWeight: 600,
-                              fontSize: '14px',
-                              marginTop: '12px',
-                              boxShadow: isAnalyzing 
-                                ? 'none' 
-                                : '0 4px 12px rgba(139, 92, 246, 0.3)',
-                              transition: 'all 0.2s ease',
-                              opacity: isAnalyzing ? 0.6 : 1,
-                            }}
-                            onMouseEnter={(e) => {
-                              if (!isAnalyzing) {
-                                e.currentTarget.style.transform = 'translateY(-1px)';
-                                e.currentTarget.style.boxShadow = '0 6px 16px rgba(139, 92, 246, 0.4)';
-                              }
-                            }}
-                            onMouseLeave={(e) => {
-                              if (!isAnalyzing) {
-                                e.currentTarget.style.transform = 'translateY(0)';
-                                e.currentTarget.style.boxShadow = '0 4px 12px rgba(139, 92, 246, 0.3)';
-                              }
-                            }}
-                          >
-                            {isAnalyzing ? '🔄 Recalculating...' : '🔄 Recalculate Analysis'}
-                          </button>
-                        )}
-                      </>
+                      <button
+                        onClick={handleEditLocation}
+                        style={{
+                          flex: 1,
+                          padding: '8px 12px',
+                          borderRadius: '6px',
+                          border: '1px solid rgba(255, 255, 255, 0.1)',
+                          background: 'rgba(255, 255, 255, 0.08)',
+                          color: 'rgba(255, 255, 255, 0.8)',
+                          cursor: 'pointer',
+                          fontWeight: 500,
+                          fontSize: '12px',
+                        }}
+                      >
+                        Edit Market Data
+                      </button>
                     )}
                   </div>
+                  
+                  {/* Detail buttons row */}
+                  {!isLocationEditMode && (
+                    <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
+                      <button
+                        onClick={() => setShowHomePurchaseDetails(!showHomePurchaseDetails)}
+                        style={{
+                          flex: 1,
+                          padding: '8px 10px',
+                          borderRadius: '6px',
+                          border: '1px solid rgba(255, 255, 255, 0.1)',
+                          background: showHomePurchaseDetails ? 'rgba(255, 255, 255, 0.15)' : 'rgba(255, 255, 255, 0.05)',
+                          color: 'rgba(255, 255, 255, 0.9)',
+                          cursor: 'pointer',
+                          fontWeight: 500,
+                          fontSize: '11px',
+                        }}
+                      >
+                        🏠 Home Purchase/Rent
+                      </button>
+                      <button
+                        onClick={() => setShowRentDetails(!showRentDetails)}
+                        style={{
+                          flex: 1,
+                          padding: '8px 10px',
+                          borderRadius: '6px',
+                          border: '1px solid rgba(255, 255, 255, 0.1)',
+                          background: showRentDetails ? 'rgba(255, 255, 255, 0.15)' : 'rgba(255, 255, 255, 0.05)',
+                          color: 'rgba(255, 255, 255, 0.9)',
+                          cursor: 'pointer',
+                          fontWeight: 500,
+                          fontSize: '11px',
+                        }}
+                      >
+                        💳 Loan Details
+                      </button>
+                      <button
+                        onClick={() => setShowInvestmentTaxDetails(!showInvestmentTaxDetails)}
+                        style={{
+                          flex: 1,
+                          padding: '8px 10px',
+                          borderRadius: '6px',
+                          border: '1px solid rgba(255, 255, 255, 0.1)',
+                          background: showInvestmentTaxDetails ? 'rgba(255, 255, 255, 0.15)' : 'rgba(255, 255, 255, 0.05)',
+                          color: 'rgba(255, 255, 255, 0.9)',
+                          cursor: 'pointer',
+                          fontWeight: 500,
+                          fontSize: '11px',
+                        }}
+                      >
+                        💰 Investment & Tax
+                      </button>
+                    </div>
+                  )}
+                  
+                  {/* Recalculate Button - Show when inputs have changed */}
+                  {hasInputsChanged() && (
+                    <button
+                      onClick={handleRecalculate}
+                      disabled={isAnalyzing}
+                      style={{
+                        width: '100%',
+                        padding: '10px 14px',
+                        borderRadius: '6px',
+                        border: 'none',
+                        background: isAnalyzing 
+                          ? 'rgba(139, 92, 246, 0.3)' 
+                          : 'linear-gradient(135deg, rgba(139, 92, 246, 0.8) 0%, rgba(99, 102, 241, 0.8) 100%)',
+                        color: 'rgba(255, 255, 255, 0.95)',
+                        cursor: isAnalyzing ? 'not-allowed' : 'pointer',
+                        fontWeight: 600,
+                        fontSize: '12px',
+                        marginTop: '12px',
+                        boxShadow: isAnalyzing 
+                          ? 'none' 
+                          : '0 4px 12px rgba(139, 92, 246, 0.3)',
+                        transition: 'all 0.2s ease',
+                        opacity: isAnalyzing ? 0.6 : 1,
+                      }}
+                      onMouseEnter={(e) => {
+                        if (!isAnalyzing) {
+                          e.currentTarget.style.transform = 'translateY(-1px)';
+                          e.currentTarget.style.boxShadow = '0 6px 16px rgba(139, 92, 246, 0.4)';
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (!isAnalyzing) {
+                          e.currentTarget.style.transform = 'translateY(0)';
+                          e.currentTarget.style.boxShadow = '0 4px 12px rgba(139, 92, 246, 0.3)';
+                        }
+                      }}
+                    >
+                      {isAnalyzing ? '🔄 Recalculating...' : '🔄 Recalculate Analysis'}
+                    </button>
+                  )}
+                  
                   {/* Modal 1: Home Purchase Details */}
                   {showHomePurchaseDetails && !isLocationEditMode && createPortal(
                     <>
@@ -5296,9 +5407,9 @@ const handleChipClick = (message: string) => {
                     style={{
                       padding: '12px 24px',
                       borderRadius: '12px',
-                      border: '1px solid rgba(139, 92, 246, 0.4)',
-                      background: 'rgba(139, 92, 246, 0.15)',
-                      color: 'rgba(196, 181, 253, 0.95)',
+                      border: '1px solid rgba(148, 163, 184, 0.4)',
+                      background: 'rgba(148, 163, 184, 0.1)',
+                      color: 'rgba(226, 232, 240, 0.9)',
                       cursor: 'pointer',
                       fontSize: '14px',
                       fontWeight: 500,
@@ -5307,12 +5418,12 @@ const handleChipClick = (message: string) => {
                       minWidth: '150px'
                     }}
                     onMouseEnter={(e) => {
-                      e.currentTarget.style.background = 'rgba(139, 92, 246, 0.25)';
-                      e.currentTarget.style.borderColor = 'rgba(139, 92, 246, 0.6)';
+                      e.currentTarget.style.background = 'rgba(148, 163, 184, 0.2)';
+                      e.currentTarget.style.borderColor = 'rgba(148, 163, 184, 0.6)';
                     }}
                     onMouseLeave={(e) => {
-                      e.currentTarget.style.background = 'rgba(139, 92, 246, 0.15)';
-                      e.currentTarget.style.borderColor = 'rgba(139, 92, 246, 0.4)';
+                      e.currentTarget.style.background = 'rgba(148, 163, 184, 0.1)';
+                      e.currentTarget.style.borderColor = 'rgba(148, 163, 184, 0.4)';
                     }}
                   >
                     Go to Summary
@@ -5323,9 +5434,9 @@ const handleChipClick = (message: string) => {
                     style={{
                       padding: '12px 24px',
                       borderRadius: '12px',
-                      border: '1px solid rgba(139, 92, 246, 0.4)',
-                      background: 'rgba(139, 92, 246, 0.15)',
-                      color: 'rgba(196, 181, 253, 0.95)',
+                      border: '1px solid rgba(148, 163, 184, 0.4)',
+                      background: 'rgba(148, 163, 184, 0.1)',
+                      color: 'rgba(226, 232, 240, 0.9)',
                       cursor: 'pointer',
                       fontSize: '14px',
                       fontWeight: 500,
@@ -5334,12 +5445,12 @@ const handleChipClick = (message: string) => {
                       minWidth: '150px'
                     }}
                     onMouseEnter={(e) => {
-                      e.currentTarget.style.background = 'rgba(139, 92, 246, 0.25)';
-                      e.currentTarget.style.borderColor = 'rgba(139, 92, 246, 0.6)';
+                      e.currentTarget.style.background = 'rgba(148, 163, 184, 0.2)';
+                      e.currentTarget.style.borderColor = 'rgba(148, 163, 184, 0.6)';
                     }}
                     onMouseLeave={(e) => {
-                      e.currentTarget.style.background = 'rgba(139, 92, 246, 0.15)';
-                      e.currentTarget.style.borderColor = 'rgba(139, 92, 246, 0.4)';
+                      e.currentTarget.style.background = 'rgba(148, 163, 184, 0.1)';
+                      e.currentTarget.style.borderColor = 'rgba(148, 163, 184, 0.4)';
                     }}
                   >
                     Go to Charts Dashboard

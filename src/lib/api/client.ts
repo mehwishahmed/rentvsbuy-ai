@@ -27,7 +27,7 @@ async function loadRuntimeConfig(): Promise<void> {
       if (error.name === 'AbortError' || error.name === 'TimeoutError') {
         console.log('config.json load timeout, using fallback logic');
       } else {
-        console.log('config.json not available, using fallback logic:', error.message);
+        console.log('config.json not available, using fallback logic:', error?.message || String(error));
       }
     }
   })();

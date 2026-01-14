@@ -18,13 +18,13 @@ export function TaxSavingsChart({ data, isExport }: TaxSavingsChartProps) {
       <ResponsiveContainer width="100%" height={280}>
         <BarChart data={data} margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
           <CartesianGrid strokeDasharray="3 3" stroke={colors.grid} />
-          <XAxis dataKey="year" stroke={colors.axis} tick={{ fill: colors.text }} />
-          <YAxis label={{ value: 'Annual Tax Savings ($)', angle: -90, position: 'insideLeft' }} stroke={colors.axis} tick={{ fill: colors.text }} />
+          <XAxis dataKey="year" stroke={colors.axis} tick={{ fill: colors.text, fontSize: 9 }} />
+          <YAxis label={{ value: 'Annual Tax Savings ($)', angle: -90, position: 'insideLeft', fontSize: 10 }} stroke={colors.axis} tick={{ fill: colors.text, fontSize: 9 }} />
           <Tooltip 
             formatter={(value: number) => `$${value.toLocaleString()}`}
-            contentStyle={{ backgroundColor: colors.tooltipBg, border: `1px solid ${colors.tooltipBorder}`, borderRadius: '10px', color: colors.tooltipText }}
+            contentStyle={{ backgroundColor: colors.tooltipBg, border: `1px solid ${colors.tooltipBorder}`, borderRadius: '10px', color: colors.tooltipText, fontSize: 11 }}
           />
-          <Legend wrapperStyle={{ color: colors.text }} />
+          <Legend wrapperStyle={{ color: colors.text, fontSize: 10 }} />
           <Bar dataKey="deductibleMortgageInterest" name="Deductible Mortgage Interest" fill={colors.bar1} />
           <Bar dataKey="deductiblePropertyTax" name="Deductible Property Tax" fill={colors.bar2} />
           <Bar dataKey="totalTaxBenefit" name="Total Tax Benefit" fill={isExport ? '#666666' : 'rgba(149, 128, 210, 0.55)'} />

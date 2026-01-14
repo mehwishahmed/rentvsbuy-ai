@@ -67,7 +67,7 @@ export function MonteCarloChart({ monteCarloHomePrices, isExport }: MonteCarloCh
         This shows best, typical, and worst-case home values over time based on ML estimates and market volatility. The shaded band is the range; the middle line is the typical path.
       </p>
       
-      <ResponsiveContainer width="100%" height={300}>
+      <ResponsiveContainer width="100%" height={280}>
         <AreaChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
           <defs>
             <linearGradient id={`colorBand-${isExport ? 'export' : 'normal'}`} x1="0" y1="0" x2="0" y2="1">
@@ -78,12 +78,12 @@ export function MonteCarloChart({ monteCarloHomePrices, isExport }: MonteCarloCh
           <CartesianGrid strokeDasharray="3 3" stroke={colors.grid} />
           <XAxis 
             dataKey="year" 
-            label={{ value: 'Years', position: 'insideBottom', offset: -5 }}
+            label={{ value: 'Years', position: 'insideBottom', offset: -5, fontSize: 10 }}
             stroke={colors.axis}
-            tick={{ fill: colors.text }}
+            tick={{ fill: colors.text, fontSize: 9 }}
           />
           <YAxis 
-            label={{ value: 'Home Value ($)', angle: -90, position: 'insideLeft' }}
+            label={{ value: 'Home Value ($)', angle: -90, position: 'insideLeft', fontSize: 10 }}
             tickFormatter={(value) => {
               if (Math.abs(value) >= 1000000) {
                 return `$${(value / 1000000).toFixed(1)}M`;
@@ -93,14 +93,14 @@ export function MonteCarloChart({ monteCarloHomePrices, isExport }: MonteCarloCh
               return `$${value}`;
             }}
             stroke={colors.axis}
-            tick={{ fill: colors.text }}
+            tick={{ fill: colors.text, fontSize: 9 }}
           />
           <Tooltip 
             formatter={(value: number) => `$${value.toLocaleString()}`}
-            contentStyle={{ backgroundColor: colors.tooltipBg, border: `1px solid ${colors.tooltipBorder}`, borderRadius: '10px', color: colors.tooltipText }}
+            contentStyle={{ backgroundColor: colors.tooltipBg, border: `1px solid ${colors.tooltipBorder}`, borderRadius: '10px', color: colors.tooltipText, fontSize: 11 }}
             labelFormatter={(year) => `Year ${year}`}
           />
-          <Legend wrapperStyle={{ color: colors.text }} />
+          <Legend wrapperStyle={{ color: colors.text, fontSize: 10 }} />
           
           {/* Shaded area between p10 and p90 */}
           <Area

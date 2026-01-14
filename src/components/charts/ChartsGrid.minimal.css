@@ -1,0 +1,62 @@
+/* MINIMAL CSS - Clean layout for Charts Dashboard */
+/* Mirrors Chat & Setup tab structure - no extra wrappers */
+
+.charts-grid-minimal {
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+.charts-content-box {
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+.charts-content-box h2 {
+  color: rgba(255, 255, 255, 0.95);
+  margin: 0 0 16px 0;
+  font-size: 24px;
+}
+
+.charts-content-box p {
+  color: rgba(255, 255, 255, 0.7);
+  margin: 0 0 16px 0;
+  line-height: 1.6;
+}
+
+.mock-chart-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+  width: 100%;
+  margin-top: 24px;
+}
+
+.mock-chart-item {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+@media (max-width: 1400px) {
+  .mock-chart-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 1000px) {
+  .mock-chart-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 600px) {
+  .mock-chart-grid {
+    grid-template-columns: 1fr;
+  }
+}
+

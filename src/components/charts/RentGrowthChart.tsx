@@ -37,12 +37,12 @@ export function RentGrowthChart({ timeline, isExport }: RentGrowthChartProps) {
           <CartesianGrid strokeDasharray="3 3" stroke={colors.grid} />
           <XAxis 
             dataKey="year" 
-            label={{ value: 'Years', position: 'insideBottom', offset: -5 }}
+            label={{ value: 'Years', position: 'insideBottom', offset: -5, fontSize: 10 }}
             stroke={colors.axis}
-            tick={{ fill: colors.text }}
+            tick={{ fill: colors.text, fontSize: 9 }}
           />
           <YAxis 
-            label={{ value: 'Monthly Payment ($)', angle: -90, position: 'insideLeft' }}
+            label={{ value: 'Monthly Payment ($)', angle: -90, position: 'insideLeft', fontSize: 10 }}
             tickFormatter={(value) => {
               if (value >= 1000) {
                 return `$${(value / 1000).toFixed(1)}k`;
@@ -50,14 +50,14 @@ export function RentGrowthChart({ timeline, isExport }: RentGrowthChartProps) {
               return `$${value}`;
             }}
             stroke={colors.axis}
-            tick={{ fill: colors.text }}
+            tick={{ fill: colors.text, fontSize: 9 }}
           />
           <Tooltip 
             formatter={(value: number) => `$${value.toLocaleString()}/mo`}
             labelFormatter={(label) => `Year ${label}`}
-            contentStyle={{ backgroundColor: colors.tooltipBg, border: `1px solid ${colors.tooltipBorder}`, borderRadius: '10px', color: colors.tooltipText }}
+            contentStyle={{ backgroundColor: colors.tooltipBg, border: `1px solid ${colors.tooltipBorder}`, borderRadius: '10px', color: colors.tooltipText, fontSize: 11 }}
           />
-          <Legend wrapperStyle={{ color: colors.text }} />
+          <Legend wrapperStyle={{ color: colors.text, fontSize: 10 }} />
           <Line 
             type="monotone" 
             dataKey="rent" 

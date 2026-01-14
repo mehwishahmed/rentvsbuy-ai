@@ -39,12 +39,12 @@ export function KeyMetricCard({
       style={{
         background: 'rgba(139, 92, 246, 0.1)',
         border: `1px solid ${style.borderColor}`,
-        borderRadius: '12px',
-        padding: '20px',
+        borderRadius: '6px',
+        padding: '8px',
         transition: 'all 0.2s',
-        height: '160px',
-        minHeight: '160px',
-        maxHeight: '160px',
+        height: '60px',
+        minHeight: '60px',
+        maxHeight: '60px',
         display: 'flex',
         flexDirection: 'column',
         position: 'relative',
@@ -53,7 +53,7 @@ export function KeyMetricCard({
       onMouseEnter={(e) => {
         e.currentTarget.style.background = 'rgba(139, 92, 246, 0.15)';
         e.currentTarget.style.borderColor = style.accentColor;
-        e.currentTarget.style.transform = 'translateY(-2px)';
+        e.currentTarget.style.transform = 'translateY(-1px)';
       }}
       onMouseLeave={(e) => {
         e.currentTarget.style.background = 'rgba(139, 92, 246, 0.1)';
@@ -62,14 +62,14 @@ export function KeyMetricCard({
       }}
     >
       {/* Header: Icon and Label */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
-        <div className="metric-icon-animated" style={{ fontSize: '28px' }}>{icon}</div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '3px' }}>
+        <div className="metric-icon-animated" style={{ fontSize: '14px' }}>{icon}</div>
         <div 
           style={{ 
-            fontSize: '12px', 
+            fontSize: '8px', 
             color: 'rgba(255, 255, 255, 0.6)', 
             textTransform: 'uppercase', 
-            letterSpacing: '0.5px',
+            letterSpacing: '0.3px',
             fontWeight: 600,
           }}
         >
@@ -80,14 +80,14 @@ export function KeyMetricCard({
       {/* Value */}
       <div 
         style={{ 
-          fontSize: '24px', 
+          fontSize: '11px', 
           fontWeight: 600, 
           color: 'rgba(255, 255, 255, 0.95)', 
-          marginBottom: '6px',
+          marginBottom: '2px',
           flex: 1,
           display: 'flex',
           alignItems: 'center',
-          lineHeight: '1.3',
+          lineHeight: '1.2',
         }}
       >
         {value}
@@ -97,9 +97,9 @@ export function KeyMetricCard({
       {subtitle && (
         <div 
           style={{ 
-            fontSize: '13px', 
+            fontSize: '8px', 
             color: 'rgba(255, 255, 255, 0.5)',
-            lineHeight: '1.3',
+            lineHeight: '1.2',
           }}
         >
           {subtitle}

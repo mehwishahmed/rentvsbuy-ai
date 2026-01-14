@@ -10,10 +10,9 @@ html, body {
   margin: 0;
   padding: 0;
   width: 100%;
-  min-height: 100%;
-  background: #0a0d14; /* Dark background to match app */
-  overflow-x: hidden;
-  overflow-y: auto;
+  height: 100%;
+  background: #0a0d14;
+  overflow: hidden;
 }
 
 * {
@@ -43,8 +42,8 @@ button:hover {
 
 /* Style for Pro tip text */
 .pro-tip {
-  background-color: rgba(139, 92, 246, 0.2);
-  color: rgba(139, 92, 246, 0.9);
+  background-color: rgba(16, 185, 129, 0.15);
+  color: #059669;
   padding: 2px 4px;
   border-radius: 3px;
 }
@@ -168,6 +167,7 @@ body {
 .app {
   min-height: 100vh;
   width: 100%;
+  height: 100%;
   position: relative;
   display: flex;
   flex-direction: column;
@@ -176,25 +176,27 @@ body {
   background: #0a0d14; /* Dark background to match chat container */
   padding: 0;
   margin: 0;
-  overflow-x: hidden;
-  overflow-y: auto;
+  overflow: hidden; /* Let fixed layouts handle scrolling */
+  min-width: 0; /* Allow flex shrinking */
 }
 
 .title-banner {
   width: 100%;
-  padding: 16px 32px;
+  padding: 8px 20px;
   background: rgba(15, 23, 42, 0.95);
   backdrop-filter: blur(20px) saturate(180%);
   -webkit-backdrop-filter: blur(20px) saturate(180%);
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   display: flex;
   flex-direction: row;
   align-items: center;
   justify-content: space-between;
-  gap: 32px;
-  z-index: 1000;
-  position: sticky;
-  top: 0;
+  gap: 20px;
+  z-index: 3000;
   box-sizing: border-box;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.24);
 }
@@ -209,7 +211,7 @@ body {
 }
 
 .title-logo {
-  max-height: 48px;
+  max-height: 30px;
   width: auto;
   display: block;
   filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
@@ -269,12 +271,12 @@ body {
 }
 
 .banner-button {
-  padding: 8px 16px;
-  border-radius: 8px;
+  padding: 5px 10px;
+  border-radius: 5px;
   border: 1px solid rgba(255, 255, 255, 0.1);
   background: rgba(255, 255, 255, 0.05);
   color: rgba(255, 255, 255, 0.9);
-  font-size: 14px;
+  font-size: 11px;
   font-weight: 500;
   letter-spacing: 0;
   text-transform: none;
@@ -386,17 +388,18 @@ body {
   display: flex;
   justify-content: center;
   width: 100%;
+  min-width: 0; /* Allow flex shrinking */
   height: 100vh;
   padding: 20px;
   box-sizing: border-box;
-  overflow: visible;
+  overflow: visible; /* Never clip content */
 }
 
 .chat-container {
-  width: 100%;
-  max-width: 100%;
+  width: 100% !important;
+  max-width: none !important; /* No max constraint - fill available space */
   height: 100%;
-  display: flex;
+  display: flex !important;
   flex-direction: column;
   background: rgba(15, 23, 42, 0.95);
   backdrop-filter: blur(20px) saturate(180%);
@@ -404,59 +407,91 @@ body {
   border-radius: 16px;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1), 0 2px 4px rgba(0, 0, 0, 0.06);
   overflow-x: hidden;
-  overflow-y: hidden;
-  flex: 1;
-  min-width: 0;
+  overflow-y: auto;
+  flex: 1 1 auto;
+  min-width: 0; /* Allow shrinking to fit viewport */
   min-height: 0;
   border: 1px solid rgba(255, 255, 255, 0.08);
+  box-sizing: border-box;
+  margin: 0 !important;
+  padding: 0;
+  position: relative;
+}
+
+/* Ensure chat-container always takes full width */
+.rvb-right .chat-container {
+  width: 100% !important;
+  max-width: 100% !important;
+  flex: 1 1 auto !important;
 }
 
 .chat-header {
-  background: rgba(15, 23, 42, 0.8);
+  background: linear-gradient(135deg, #1e293b 0%, #1e3a5f 100%);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   color: white;
-  padding: 16px 24px;
+  padding: 16px 20px;
   text-align: center;
   position: relative;
   display: flex;
   align-items: center;
   justify-content: flex-start;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  width: 100% !important;
+  max-width: none !important; /* No max width constraint */
+  box-sizing: border-box;
+  margin: 0 !important;
+  flex-shrink: 0;
+  min-width: 0; /* Allow shrinking to fit viewport */
+  gap: 8px;
+  flex-wrap: wrap; /* Allow tabs to wrap on small screens */
 }
 
 .chat-header h1 {
-  font-size: 24px;
+  font-size: 20px;
   font-weight: 600;
   margin: 0;
   padding-left: 0;
+  white-space: nowrap;
+  min-width: 0;
+  flex-shrink: 0;
 }
 
 .header-buttons {
-  position: absolute;
-  right: 20px;
+  position: relative;
+  right: auto;
   display: flex;
-  gap: 12px;
+  gap: 8px;
   align-items: center;
+  margin: 0;
+  margin-left: auto; /* Push to right */
+  padding: 0;
+  flex-wrap: wrap;
+  min-width: 0;
 }
 
 .tab-buttons {
   display: flex;
-  gap: 8px;
-  margin-right: 12px;
+  gap: 6px;
+  margin-right: 0;
+  flex-wrap: wrap;
+  min-width: 0;
 }
 
 .tab-button {
-  padding: 8px 16px;
+  padding: 5px 8px;
   background: rgba(255, 255, 255, 0.05);
   color: rgba(255, 255, 255, 0.7);
   border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
-  font-size: 14px;
+  border-radius: 5px;
+  font-size: 11px;
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   backdrop-filter: blur(10px);
+  white-space: nowrap;
+  min-width: 0;
+  flex-shrink: 1;
 }
 
 .tab-button:hover:not(:disabled) {
@@ -477,6 +512,9 @@ body {
   cursor: not-allowed;
 }
 
+/* Charts wrapper - removed duplicate, see below */
+
+/* Keep old classes for backward compatibility but make them work within messages-container */
 .charts-tab-container {
   flex: 1;
   display: flex;
@@ -491,7 +529,7 @@ body {
 .charts-grid-wrapper {
   flex: 1;
   display: flex;
-  justify-content: flex-start;
+  justify-content: center;
   padding-bottom: 20px;
   width: 100%;
 }
@@ -506,6 +544,7 @@ body {
   border-radius: 16px;
   padding: 12px 8px;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1), 0 2px 4px rgba(0, 0, 0, 0.06);
+  margin: 0;
 }
 
 .assumption-controls-column {
@@ -733,13 +772,63 @@ body {
 }
 
 .messages-container {
-  flex: 1;
+  flex: 1 1 auto;
   overflow-y: auto;
-  padding: 20px;
+  overflow-x: auto; /* Allow horizontal scroll at small sizes */
+  padding: 16px 20px 0 20px;
   display: flex;
   flex-direction: column;
   gap: 16px;
   background: #1a1d29;
+  min-height: 0;
+  width: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box;
+  min-width: 0 !important;
+  position: relative;
+}
+
+/* When messages-container contains summary wrapper, use CSS GRID to center */
+.messages-container > .summary-wrapper {
+  width: calc(100% + 40px) !important;
+  max-width: calc(100% + 40px) !important;
+  box-sizing: border-box;
+  display: grid !important;
+  grid-template-columns: 1fr minmax(600px, 1600px) 1fr !important;
+  justify-items: stretch !important;
+  align-items: start !important;
+  margin: 0 -20px !important;
+  padding: 0 !important;
+  min-height: 0;
+  overflow: visible;
+}
+
+/* Charts wrapper - full width, no grid constraint */
+.messages-container > .charts-wrapper {
+  width: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box;
+  display: block !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  min-height: 0;
+  overflow: visible;
+}
+
+.messages-container > .summary-wrapper > * {
+  grid-column: 2 !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  justify-self: stretch !important;
+  align-self: start !important;
+  margin: 0 !important;
+}
+
+.messages-container > .charts-wrapper > * {
+  width: 100% !important;
+  max-width: 100% !important;
+  margin: 0 !important;
+  box-sizing: border-box !important;
 }
 
 /* Chat-level actions row (outside main chat box) */
@@ -750,49 +839,225 @@ body {
   margin-bottom: 8px;
 }
 
-/* Summary tab container - match chat box sizing */
-.summary-tab-container {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  padding: 20px;
-  background: #1a1d29;
-  overflow-y: hidden;
-  gap: 20px;
+/* Summary wrapper - use CSS GRID to center with EQUAL side columns */
+.summary-wrapper {
+  display: grid !important;
+  grid-template-columns: 1fr minmax(600px, 1600px) 1fr !important;
+  justify-items: stretch !important;
+  align-items: start !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  margin: 0 auto !important;
+  padding: 0 !important;
+  box-sizing: border-box !important;
 }
 
-/* Summary empty state */
-.summary-empty-state {
+.summary-wrapper > * {
+  grid-column: 2 !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  justify-self: stretch !important;
+  align-self: start !important;
+  margin: 0 !important;
+}
+
+/* Charts wrapper - full width for charts dashboard */
+.charts-wrapper {
+  display: block !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  box-sizing: border-box !important;
+}
+
+.charts-wrapper > * {
+  width: 100% !important;
+  max-width: 100% !important;
+  margin: 0 !important;
+}
+
+/* Charts grid container - full screen width */
+.charts-wrapper .charts-grid-container {
+  display: flex !important;
+  flex-direction: column;
+  width: 100% !important;
+  max-width: 100% !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  box-sizing: border-box;
+}
+
+/* Remove padding from messages-container when it contains charts-wrapper */
+.messages-container:has(.charts-wrapper) {
+  padding: 20px 0 !important; /* Only vertical padding, no horizontal */
+  overflow-x: visible !important; /* Ensure content is never clipped */
+}
+
+/* Make all chart containers full width when inside charts-wrapper */
+.charts-wrapper .chart-container,
+.charts-wrapper .chart-wrapper,
+.charts-wrapper .hero-chart-wrapper {
+  width: 100% !important;
+  max-width: 100% !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+  padding-left: 20px !important;
+  padding-right: 20px !important;
+  box-sizing: border-box !important;
+  min-width: 0 !important; /* Allow flex shrinking */
+  overflow: visible !important; /* Never clip content */
+}
+
+/* Scenario overlay and other chart content - full width */
+.charts-wrapper .scenario-overlay-scroll,
+.charts-wrapper .scenario-grid,
+.charts-wrapper .chart-insight-panel {
+  width: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+  min-width: 0 !important; /* Allow flex shrinking */
+  overflow: visible !important; /* Never clip content */
+}
+
+/* Summary tab container - match charts container */
+.summary-wrapper > .summary-tab-container {
+  display: flex !important;
+  flex-direction: column;
+  gap: 20px;
+  width: 100% !important;
+  max-width: 100% !important;
+  margin: 0 !important;
+  padding: 0 20px !important;
+  box-sizing: border-box;
+}
+
+/* Summary tab container - MATCH charts-grid-container exactly */
+.summary-tab-container {
+  display: flex !important;
+  flex-direction: column;
+  gap: 8px;
+  width: 100% !important;
+  max-width: 100% !important;
+  margin: 0 !important;
+  padding: 0 !important; /* No padding - parent has it */
+  box-sizing: border-box;
+  overflow: visible !important;
+  position: relative;
+  min-width: 0 !important;
+}
+
+/* New side-by-side layout for Summary */
+.summary-top-row {
   display: flex;
+  gap: 24px;
+  width: 100%;
+  max-width: 1000px;
+  margin: 0 auto;
+  padding-top: 24px;
+  box-sizing: border-box;
+}
+
+.summary-top-row .hero-chart-wrapper {
+  flex: 1 1 0;
+  min-width: 0;
+  margin-bottom: 0 !important;
+}
+
+.summary-top-row .metrics-panel {
+  flex: 0 0 200px;
+  width: 200px;
+}
+
+.metrics-grid-vertical {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+
+@media (max-width: 900px) {
+  .summary-top-row {
+    flex-direction: column;
+  }
+  
+  .summary-top-row .hero-chart-wrapper,
+  .summary-top-row .metrics-panel {
+    flex: 1 1 100%;
+    max-width: 100%;
+  }
+}
+
+/* Summary empty state - already centered by grid */
+.summary-wrapper > .summary-empty-state {
+  display: flex !important;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  min-height: 400px;
+  min-height: calc(100vh - 200px);
   text-align: center;
   color: rgba(255, 255, 255, 0.7);
+  width: 100% !important;
+  max-width: 100% !important;
+  padding: 48px 32px;
+  background: rgba(30, 30, 40, 0.9);
+  border-radius: 16px;
+  border: 1px solid rgba(139, 92, 246, 0.25);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  box-sizing: border-box;
+  margin: 0 !important;
+}
+
+/* Summary empty state - centered and enlarged */
+.summary-empty-state {
+  display: flex !important;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 300px;
+  flex: 1 1 auto !important;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.7);
+  width: 100% !important;
+  max-width: 700px !important; /* Limit width for centered look */
+  padding: 40px 36px;
+  background: rgba(30, 30, 40, 0.9);
+  border-radius: 16px;
+  border: 1px solid rgba(139, 92, 246, 0.25);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  box-sizing: border-box;
+  margin: 0 auto !important; /* Center horizontally */
+  min-width: 0 !important;
+  position: relative;
+  overflow: visible !important;
 }
 
 .summary-empty-state h2 {
-  font-size: 24px;
-  margin-bottom: 12px;
+  font-size: 18px;
+  margin-bottom: 10px;
   color: rgba(255, 255, 255, 0.9);
 }
 
 .summary-empty-state p {
-  font-size: 16px;
+  font-size: 13px;
   color: rgba(255, 255, 255, 0.6);
 }
 
 /* Hero chart wrapper */
 .hero-chart-wrapper {
   width: 100%;
-  max-width: 1600px;
-  margin: 0 auto;
+  max-width: 100%;
+  margin: 0;
   background: rgba(30, 30, 40, 0.6);
-  border-radius: 16px;
-  padding: 24px;
-  padding-bottom: 12px;
+  border-radius: 8px;
+  padding: 8px;
+  padding-bottom: 4px;
   border: 1px solid rgba(139, 92, 246, 0.2);
+}
+
+/* Remove max-width constraint when inside charts-wrapper */
+.charts-wrapper .hero-chart-wrapper {
+  max-width: 100% !important;
+  margin: 0 !important;
 }
 
 .hero-chart-wrapper .chart-container {
@@ -808,8 +1073,8 @@ body {
 }
 
 .hero-chart-wrapper .recharts-responsive-container {
-  min-height: 420px;
-  height: 420px;
+  min-height: 360px;
+  height: 360px;
   margin-bottom: 0;
 }
 
@@ -825,33 +1090,35 @@ body {
 /* Metrics panel */
 .metrics-panel {
   background: rgba(30, 30, 40, 0.6);
-  border-radius: 16px;
-  padding: 20px;
+  border-radius: 8px;
+  padding: 8px;
   border: 1px solid rgba(139, 92, 246, 0.2);
 }
 
 .metrics-panel-title {
-  font-size: 26px;
+  font-size: 11px;
   font-weight: 600;
   color: rgba(255, 255, 255, 0.9);
+  margin-bottom: 6px;
   margin-bottom: 20px;
 }
 
 .metrics-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 16px;
-  max-width: 1400px;
-  margin: 0 auto;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 6px;
+  max-width: 100%;
+  width: 100%;
+  margin: 0;
 }
 
 .metric-tile {
   background: rgba(139, 92, 246, 0.1);
   border: 1px solid rgba(139, 92, 246, 0.2);
-  border-radius: 12px;
-  padding: 16px;
+  border-radius: 6px;
+  padding: 6px;
   transition: all 0.2s;
-  height: 140px;
+  height: 55px;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -864,18 +1131,18 @@ body {
 }
 
 .metric-label {
-  font-size: 13px;
+  font-size: 9px;
   color: rgba(255, 255, 255, 0.6);
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  margin-bottom: 8px;
+  margin-bottom: 4px;
 }
 
 .metric-value {
-  font-size: 24px;
+  font-size: 14px;
   font-weight: 600;
   color: rgba(255, 255, 255, 0.95);
-  margin-bottom: 4px;
+  margin-bottom: 2px;
 }
 
 .metric-subtitle {
@@ -884,18 +1151,24 @@ body {
 }
 
 /* Insight box */
-.insight-box {
+.summary-tab-container .insight-box {
   background: rgba(30, 30, 40, 0.6);
-  border-radius: 16px;
-  padding: 20px;
+  border-radius: 8px;
+  padding: 16px 20px;
   border: 1px solid rgba(139, 92, 246, 0.2);
+  text-align: center;
+  width: 100%;
+  max-width: 1000px;
+  margin: 0 auto;
+  box-sizing: border-box;
 }
 
 .insight-box-title {
-  font-size: 26px;
+  font-size: 12px;
   font-weight: 600;
   color: rgba(255, 255, 255, 0.9);
-  margin-bottom: 20px;
+  margin-bottom: 8px;
+  text-align: left;
 }
 
 .insight-generate-button,
@@ -904,9 +1177,9 @@ body {
   background: linear-gradient(135deg, rgba(139, 92, 246, 0.9) 0%, rgba(59, 130, 246, 0.9) 100%);
   color: white;
   border: none;
-  padding: 16px 32px;
-  border-radius: 8px;
-  font-size: 18px;
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 11px;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.3s ease;
@@ -1003,22 +1276,23 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 16px;
-  padding: 24px;
+  gap: 8px;
+  padding: 12px;
   color: rgba(255, 255, 255, 0.7);
 }
 
 .insight-loading p {
-  font-size: 14px;
+  font-size: 10px;
 }
 
 .insight-error {
-  padding: 16px;
+  padding: 8px;
   background: rgba(239, 68, 68, 0.1);
   border: 1px solid rgba(239, 68, 68, 0.3);
-  border-radius: 8px;
+  border-radius: 6px;
   color: rgba(255, 255, 255, 0.9);
-  margin-bottom: 16px;
+  margin-bottom: 8px;
+  font-size: 10px;
 }
 
 .insight-error p {
@@ -1026,17 +1300,17 @@ body {
 }
 
 .insight-content {
-  padding: 20px;
+  padding: 10px;
   background: rgba(139, 92, 246, 0.05);
-  border-radius: 12px;
+  border-radius: 8px;
   border: 1px solid rgba(139, 92, 246, 0.2);
 }
 
 .insight-content p {
-  font-size: 16px;
-  line-height: 1.6;
+  font-size: 11px;
+  line-height: 1.4;
   color: rgba(255, 255, 255, 0.85);
-  margin-bottom: 16px;
+  margin-bottom: 8px;
 }
 
 .insight-regenerate-button {
@@ -1142,9 +1416,10 @@ body {
 
 .message-bubble {
   max-width: 70%;
-  padding: 12px 16px;
-  border-radius: 12px;
-  line-height: 1.5;
+  padding: 10px 14px;
+  border-radius: 10px;
+  line-height: 1.45;
+  font-size: 14px;
 }
 
 .user-bubble {
@@ -1167,20 +1442,24 @@ body {
 
 .chat-input-form {
   display: flex;
-  padding: 16px 24px;
-  gap: 12px;
+  padding: 12px 16px;
+  gap: 10px;
   border-top: 1px solid rgba(255, 255, 255, 0.08);
   background: rgba(15, 23, 42, 0.8);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important; /* Match charts-grid-container */
+  box-sizing: border-box;
 }
 
 .chat-input {
-  flex: 1;
-  padding: 12px 16px;
+  flex: 1 1 auto;
+  padding: 10px 14px;
   border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
-  font-size: 14px;
+  border-radius: 6px;
+  font-size: 13px;
   outline: none;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   background: rgba(255, 255, 255, 0.05);
@@ -1188,6 +1467,8 @@ body {
   font-family: 'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
     'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
     sans-serif;
+  min-width: 0 !important; /* Allow shrinking */
+  width: 100%;
 }
 
 .chat-input:focus {
@@ -1201,12 +1482,12 @@ body {
 }
 
 .send-button {
-  padding: 12px 24px;
+  padding: 10px 18px;
   background: rgba(255, 255, 255, 0.1);
   color: rgba(255, 255, 255, 0.9);
   border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
-  font-size: 14px;
+  border-radius: 6px;
+  font-size: 13px;
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
@@ -1237,6 +1518,10 @@ body {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
   animation: fadeInUp 0.5s ease-out;
   border: 1px solid rgba(139, 92, 246, 0.2);
+  position: relative;
+  z-index: 0;
+  overflow: hidden; /* Prevent content overflow */
+  box-sizing: border-box;
 }
 
 /* Recharts tooltip styling */
@@ -1277,6 +1562,26 @@ body {
   color: rgba(255, 255, 255, 0.95);
   margin-bottom: 20px;
   text-align: center;
+}
+
+/* Hide chart titles and captions when inside chart-grid-item (ChartsGrid already provides headers) */
+.chart-grid-item .chart-title,
+.chart-grid-item .chart-caption {
+  display: none !important;
+}
+
+/* Also hide chart titles/captions when inside chart-wrapper or chart-container within grid */
+.chart-grid-item .chart-wrapper .chart-title,
+.chart-grid-item .chart-wrapper .chart-caption,
+.chart-grid-item .chart-container .chart-title,
+.chart-grid-item .chart-container .chart-caption,
+.chart-grid-item-content .chart-title,
+.chart-grid-item-content .chart-caption {
+  display: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  height: 0 !important;
+  visibility: hidden !important;
 }
 
 .chart-description {
@@ -1492,15 +1797,19 @@ body {
 
 /* Footer Styles */
 .chat-footer {
-  padding: 12px 20px;
+  padding: 8px 16px;
   background: rgba(30, 30, 40, 0.8);
   border-top: 1px solid rgba(139, 92, 246, 0.2);
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  font-size: 13px;
+  gap: 6px;
+  font-size: 11px;
   color: rgba(255, 255, 255, 0.7);
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important; /* Match charts-grid-container */
+  box-sizing: border-box;
 }
 
 .chat-footer span:nth-child(2) {
@@ -1510,10 +1819,10 @@ body {
 
 /* Insights Summary Styles */
 .insights-summary {
-  background: linear-gradient(135deg, #1e293b 0%, #064e3b 100%);
-  border-radius: 16px;
-  padding: 24px;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+  background: linear-gradient(135deg, #1e293b 0%, #1e3a5f 100%);
+  border-radius: 10px;
+  padding: 10px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
   animation: slideInLeft 0.5s ease-out;
   height: 100%;
   display: flex;
@@ -1534,20 +1843,20 @@ body {
 .insights-header {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  margin-bottom: 12px;
+  gap: 3px;
+  margin-bottom: 8px;
 }
 
 .insights-header h3 {
   color: white;
-  font-size: 22px;
+  font-size: 14px;
   font-weight: 600;
   margin: 0;
 }
 
 .insights-subtitle {
   color: rgba(255, 255, 255, 0.7);
-  font-size: 12px;
+  font-size: 10px;
   font-weight: 400;
 }
 
@@ -1586,15 +1895,15 @@ body {
 .insights-grid {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 6px;
 }
 
 .insight-card {
   background: rgba(255, 255, 255, 0.15);
   backdrop-filter: blur(10px);
   border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 12px;
-  padding: 18px;
+  border-radius: 8px;
+  padding: 8px;
   transition: transform 0.2s, box-shadow 0.2s;
 }
 
@@ -1610,29 +1919,29 @@ body {
 
 .insight-label {
   color: rgba(255, 255, 255, 0.8);
-  font-size: 11px;
+  font-size: 9px;
   font-weight: 600;
-  margin-bottom: 8px;
+  margin-bottom: 3px;
   text-transform: uppercase;
   letter-spacing: 0.8px;
 }
 
 .insight-value {
   color: white;
-  font-size: 26px;
+  font-size: 14px;
   font-weight: 700;
-  margin-bottom: 6px;
+  margin-bottom: 2px;
   line-height: 1.2;
 }
 
 .insight-value.winner {
-  font-size: 28px;
+  font-size: 16px;
 }
 
 .insight-detail {
   color: rgba(255, 255, 255, 0.9);
-  font-size: 13px;
-  line-height: 1.4;
+  font-size: 10px;
+  line-height: 1.3;
 }
 
 /* Chart Navigation Section */
@@ -2666,22 +2975,26 @@ body {
 
 /* New Layout Structure */
 .rvb-layout {
+  position: fixed;
+  top: 46px; /* Below title-banner */
+  left: 0;
+  right: 0;
+  bottom: 0;
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  width: 100%;
-  max-width: 100%;
-  height: 100vh;
-  margin: 0 auto;
-  padding: 20px;
+  gap: 0;
+  padding: 0;
+  margin: 0;
   box-sizing: border-box;
-  overflow: visible;
+  overflow: hidden;
+  min-width: 0;
+  z-index: 2000;
+  background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%);
 }
 
 /* Responsive: Use more space on larger screens */
 @media (min-width: 1400px) {
-  .rvb-layout {
-    max-width: 95%;
+  .rvb-main {
     padding: 24px;
   }
   
@@ -2699,13 +3012,13 @@ body {
 }
 
 @media (min-width: 1920px) {
-  .rvb-layout {
-    max-width: 90%;
+  .rvb-main {
     padding: 32px;
   }
   
   .rvb-left {
-    flex: 0 0 40%;
+    flex: 0 0 420px;
+    max-width: 480px;
   }
   
   .rvb-right {
@@ -2714,18 +3027,6 @@ body {
   
   .chat-container {
     max-width: 100%;
-  }
-}
-
-@media (min-width: 1920px) {
-  .rvb-layout {
-    max-width: 90%;
-    padding: 32px;
-  }
-  
-  .rvb-left {
-    flex: 0 0 420px;
-    max-width: 480px;
   }
 }
 
@@ -2757,35 +3058,392 @@ body {
   flex: 1;
   gap: 16px;
   min-height: 0;
-  width: 100%;
-  max-width: 100%;
-  overflow: visible;
+  width: 100% !important;
+  max-width: 100% !important;
+  overflow-x: hidden;
+  overflow-y: auto;
+  align-items: stretch;
+  min-width: 0;
+  padding: 20px;
+  box-sizing: border-box;
 }
 
 .rvb-left {
-  flex: 0 0 40%;
-  min-width: 300px;
-  overflow-y: visible;
-  overflow-x: visible;
+  flex: 0 0 auto; /* Don't grow, don't shrink, auto basis */
+  width: 300px; /* Fixed width instead of percentage */
+  max-width: 340px;
+  min-width: 240px;
+  overflow: visible !important;
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  padding: 0 8px 0 20px;
+  gap: 12px;
+  padding: 0 8px 0 12px;
   box-sizing: border-box;
   position: relative;
   z-index: 1;
 }
 
 .rvb-right {
-  flex: 1;
+  flex: 1 1 60% !important; /* Take remaining space after left column */
   display: flex;
   flex-direction: column;
-  overflow: hidden;
-  min-width: 0;
+  overflow: visible !important;
+  min-width: 0 !important;
+  width: auto !important; /* Let flex handle width */
   justify-content: flex-start;
   position: relative;
   align-items: stretch;
   z-index: 2;
+  max-width: none !important; /* No max constraint */
+  box-sizing: border-box;
+}
+
+/* When left column is hidden (Summary/Charts tabs), center and enlarge */
+.rvb-main.no-left-column {
+  width: 100% !important;
+  max-width: 100% !important;
+  justify-content: center !important;
+  overflow: visible !important;
+}
+
+.rvb-main.no-left-column .rvb-right {
+  width: 100% !important;
+  max-width: none !important; /* NO max-width limit - fill available space */
+  flex: 1 1 100% !important;
+  margin: 0 !important;
+  min-width: 0 !important;
+  overflow: visible !important;
+}
+
+.rvb-main.no-left-column .chat-container {
+  width: 100% !important;
+  max-width: none !important; /* NO max-width - expand fully */
+  min-width: 0 !important;
+  overflow: visible !important;
+}
+
+.rvb-main.no-left-column .chat-header {
+  width: 100% !important;
+  max-width: none !important;
+  min-width: 0 !important;
+  box-sizing: border-box !important;
+  flex-shrink: 0 !important;
+}
+
+.rvb-main.no-left-column .messages-container {
+  width: 100% !important;
+  max-width: none !important;
+  padding: 40px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important; /* Center all children horizontally */
+  justify-content: flex-start !important;
+  overflow: visible !important;
+  min-width: 0 !important;
+}
+
+/* Center and enlarge Summary content */
+.rvb-main.no-left-column .summary-tab-container,
+.rvb-main.no-left-column .summary-empty-state {
+  width: 100% !important;
+  max-width: 900px !important;
+  margin: 0 auto !important;
+  padding: 60px !important;
+  min-width: 0 !important;
+  box-sizing: border-box !important;
+}
+
+/* Center and enlarge Charts content */
+.rvb-main.no-left-column .charts-grid-container {
+  width: 100% !important;
+  max-width: 1400px !important;
+  margin: 0 auto !important;
+  min-width: 0 !important;
+  box-sizing: border-box !important;
+  padding: 20px !important;
+}
+
+/* ============================================
+   CHAT TAB - Independent Full-Width Layout
+   ============================================ */
+.chat-tab-layout {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  width: 100vw;
+  height: 100vh;
+  background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%);
+  overflow: hidden;
+  z-index: 2000;
+  box-sizing: border-box;
+}
+
+.chat-tab-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 16px;
+  background: linear-gradient(135deg, #1e293b 0%, #1e3a5f 100%);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  flex-shrink: 0;
+  gap: 10px;
+  width: 100%;
+  box-sizing: border-box;
+  overflow: visible;
+}
+
+.chat-tab-header .header-buttons {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 8px;
+}
+
+.chat-tab-header .tab-buttons {
+  display: flex;
+  flex-direction: row;
+  gap: 8px;
+  flex-wrap: nowrap;
+}
+
+.chat-tab-header .tab-button {
+  white-space: nowrap;
+  padding: 5px 10px;
+  flex-shrink: 0;
+  min-width: auto;
+  font-size: 11px;
+}
+
+.chat-tab-header h1 {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 0;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* Hide the duplicate header inside chat-container when using chat-tab-header */
+.rvb-layout .chat-container .chat-header {
+  display: none;
+}
+
+.chat-tab-content {
+  flex: 1 1 0;
+  min-height: 0; /* Critical for flex scroll to work */
+  overflow-y: auto !important;
+  overflow-x: hidden;
+  padding: 16px;
+  display: flex;
+  gap: 16px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.chat-tab-left {
+  flex: 0 0 350px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 400px;
+  min-width: 280px;
+}
+
+.chat-tab-right {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.chat-tab-footer {
+  padding: 8px 16px;
+  background: rgba(30, 30, 40, 0.8);
+  border-top: 1px solid rgba(139, 92, 246, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.7);
+  flex-shrink: 0;
+}
+
+/* ============================================
+   CHARTS TAB - Independent Full-Width Layout
+   ============================================ */
+.charts-tab-layout {
+  position: fixed;
+  top: 46px; /* Below title-banner */
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%);
+  overflow: hidden;
+  z-index: 2000;
+  box-sizing: border-box;
+}
+
+.charts-tab-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 16px;
+  background: linear-gradient(135deg, #1e293b 0%, #1e3a5f 100%);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  flex-shrink: 0;
+  gap: 10px;
+  width: 100%;
+  box-sizing: border-box;
+  overflow: visible;
+}
+
+.charts-tab-header .header-buttons {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 8px;
+}
+
+.charts-tab-header .tab-buttons {
+  display: flex;
+  flex-direction: row;
+  gap: 8px;
+  flex-wrap: nowrap;
+}
+
+.charts-tab-header .tab-button {
+  white-space: nowrap;
+  padding: 5px 10px;
+  flex-shrink: 0;
+  min-width: auto;
+  font-size: 11px;
+}
+
+.charts-tab-header h1 {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 0;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.charts-tab-content {
+  flex: 1 1 0;
+  min-height: 0; /* Critical for flex scroll to work */
+  overflow-y: auto !important;
+  overflow-x: hidden;
+  padding: 16px 16px 32px 16px; /* Compact padding */
+}
+
+.charts-tab-footer {
+  padding: 8px 16px;
+  background: rgba(30, 30, 40, 0.8);
+  border-top: 1px solid rgba(139, 92, 246, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.7);
+  flex-shrink: 0;
+}
+
+/* ============================================
+   SUMMARY TAB - Independent Centered Layout
+   ============================================ */
+.summary-tab-layout {
+  position: fixed;
+  top: 46px; /* Below title-banner */
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%);
+  overflow: hidden;
+  z-index: 2000;
+  box-sizing: border-box;
+}
+
+.summary-tab-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 16px;
+  background: linear-gradient(135deg, #1e293b 0%, #1e3a5f 100%);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  flex-shrink: 0;
+  gap: 10px;
+  width: 100%;
+  box-sizing: border-box;
+  overflow: visible;
+}
+
+.summary-tab-header .header-buttons {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 8px;
+}
+
+.summary-tab-header .tab-buttons {
+  display: flex;
+  flex-direction: row;
+  gap: 8px;
+  flex-wrap: nowrap;
+}
+
+.summary-tab-header .tab-button {
+  white-space: nowrap;
+  padding: 5px 10px;
+  flex-shrink: 0;
+  min-width: auto;
+  font-size: 11px;
+}
+
+.summary-tab-header h1 {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 0;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.summary-tab-content {
+  flex: 1 1 0;
+  min-height: 0; /* Critical for flex scroll to work */
+  overflow-y: auto !important;
+  overflow-x: hidden;
+  padding: 10px;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+}
+
+.summary-tab-content .summary-empty-state,
+.summary-tab-content .summary-tab-container {
+  width: 100%;
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.summary-tab-footer {
+  padding: 8px 16px;
+  background: rgba(30, 30, 40, 0.8);
+  border-top: 1px solid rgba(139, 92, 246, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.7);
+  flex-shrink: 0;
 }
 
 .rvb-charts {
@@ -2855,10 +3513,6 @@ body {
 
 /* Responsive: Adjust for different screen sizes */
 @media (min-width: 1920px) {
-  .rvb-layout {
-    max-width: 1800px;
-  }
-  
   .rvb-left {
     flex: 0 0 40%;
   }
@@ -2869,10 +3523,6 @@ body {
 }
 
 @media (min-width: 1440px) and (max-width: 1919px) {
-  .rvb-layout {
-    max-width: 1400px;
-  }
-  
   .rvb-left {
     flex: 0 0 40%;
   }
@@ -2906,8 +3556,7 @@ body {
 
 /* Large screens: Expand chat to use more space */
 @media (min-width: 1400px) {
-  .rvb-layout {
-    max-width: 95%;
+  .rvb-main {
     padding: 24px;
   }
   
@@ -2929,26 +3578,6 @@ body {
   
   .messages-container {
     max-width: 100%;
-  }
-}
-
-@media (min-width: 1920px) {
-  .rvb-layout {
-    max-width: 90%;
-    padding: 32px;
-  }
-  
-  .rvb-left {
-    flex: 0 0 40%;
-  }
-  
-  .rvb-right {
-    flex: 1;
-  }
-  
-  .chat-container {
-    max-width: 100%;
-    width: 100%;
   }
 }
 
@@ -3023,6 +3652,14 @@ body {
     padding: 16px;
   }
 }
+
+/* ============================================
+   CLEAN LAYOUT CSS - TEMPORARY FOR TESTING
+   Mirrors Chat & Setup tab - no extra wrappers needed
+   ============================================ */
+
+/* Summary and Charts tabs use messages-container directly, just like Chat tab */
+/* No special wrapper CSS needed - let messages-container handle it naturally */
 
 /* Small mobile - further compact */
 @media (max-width: 480px) {

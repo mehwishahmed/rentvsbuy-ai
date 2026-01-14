@@ -34,17 +34,17 @@ export function EquityBuildupChart({ timeline, isExport }: EquityBuildupChartPro
         This shows how much of the home you actually own (equity) over time when you buy. Higher is better.
       </p>
       
-      <ResponsiveContainer width="100%" height={300}>
+      <ResponsiveContainer width="100%" height={280}>
         <LineChart data={chartData}>
           <CartesianGrid strokeDasharray="3 3" stroke={colors.grid} />
           <XAxis 
             dataKey="year" 
-            label={{ value: 'Years', position: 'insideBottom', offset: -5 }}
+            label={{ value: 'Years', position: 'insideBottom', offset: -5, fontSize: 10 }}
             stroke={colors.axis}
-            tick={{ fill: colors.text }}
+            tick={{ fill: colors.text, fontSize: 9 }}
           />
           <YAxis 
-            label={{ value: 'Home Equity ($)', angle: -90, position: 'insideLeft' }}
+            label={{ value: 'Home Equity ($)', angle: -90, position: 'insideLeft', fontSize: 10 }}
             tickFormatter={(value) => {
               if (value >= 1000000) {
                 return `$${(value / 1000000).toFixed(1)}M`;
@@ -54,7 +54,7 @@ export function EquityBuildupChart({ timeline, isExport }: EquityBuildupChartPro
               return `$${value}`;
             }}
             stroke={colors.axis}
-            tick={{ fill: colors.text }}
+            tick={{ fill: colors.text, fontSize: 9 }}
           />
           <Tooltip 
             formatter={(value: number, name: string) => {
@@ -64,9 +64,9 @@ export function EquityBuildupChart({ timeline, isExport }: EquityBuildupChartPro
               return value;
             }}
             labelFormatter={(label) => `Year ${label}`}
-            contentStyle={{ backgroundColor: colors.tooltipBg, border: `1px solid ${colors.tooltipBorder}`, borderRadius: '10px', color: colors.tooltipText }}
+            contentStyle={{ backgroundColor: colors.tooltipBg, border: `1px solid ${colors.tooltipBorder}`, borderRadius: '10px', color: colors.tooltipText, fontSize: 11 }}
           />
-          <Legend wrapperStyle={{ color: colors.text }} />
+          <Legend wrapperStyle={{ color: colors.text, fontSize: 10 }} />
           <Line 
             type="monotone" 
             dataKey="equity" 

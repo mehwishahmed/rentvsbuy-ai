@@ -38,20 +38,20 @@ export function NetWorthChart({ timeline, isExport }: NetWorthChartProps) {
   return (
     <div className="chart-container" style={containerStyles}>
       <h3 className="chart-title" style={titleStyles}>Net Worth Comparison Over {Math.ceil(timeline.length / 12)} Years</h3>
-      <p className="chart-caption" style={{ marginBottom: '16px', fontSize: '14px', lineHeight: '1.5', ...captionStyles }}>
+      <p className="chart-caption" style={{ marginBottom: '6px', fontSize: '10px', lineHeight: '1.3', ...captionStyles }}>
         This shows how your net worth changes over time if you buy versus rent. Higher lines are better.
       </p>
-      <ResponsiveContainer width="100%" height={420}>
+      <ResponsiveContainer width="100%" height={280}>
         <LineChart data={chartData}>
           <CartesianGrid strokeDasharray="3 3" stroke={colors.grid} />
           <XAxis 
             dataKey="year" 
-            label={{ value: 'Years', position: 'insideBottom', offset: -5 }}
+            label={{ value: 'Years', position: 'insideBottom', offset: -5, fontSize: 10 }}
             stroke={colors.axis}
-            tick={{ fill: colors.text }}
+            tick={{ fill: colors.text, fontSize: 9 }}
           />
             <YAxis 
-            label={{ value: 'Net Worth ($)', angle: -90, position: 'insideLeft' }}
+            label={{ value: 'Net Worth ($)', angle: -90, position: 'insideLeft', fontSize: 10 }}
             tickFormatter={(value) => {
                 if (value >= 1000000) {
                 return `$${(value / 1000000).toFixed(1)}M`;
@@ -61,15 +61,15 @@ export function NetWorthChart({ timeline, isExport }: NetWorthChartProps) {
                 return `$${value}`;
             }}
             stroke={colors.axis}
-            tick={{ fill: colors.text }}
+            tick={{ fill: colors.text, fontSize: 9 }}
             />
           <Tooltip 
             formatter={(value: number) => `$${value.toLocaleString()}`}
             labelFormatter={(label) => `Year ${label}`}
-            contentStyle={{ backgroundColor: colors.tooltipBg, border: `1px solid ${colors.tooltipBorder}`, borderRadius: '10px', color: colors.tooltipText }}
+            contentStyle={{ backgroundColor: colors.tooltipBg, border: `1px solid ${colors.tooltipBorder}`, borderRadius: '10px', color: colors.tooltipText, fontSize: 11 }}
           />
           <Legend 
-            wrapperStyle={{ color: colors.text, marginTop: '20px' }} 
+            wrapperStyle={{ color: colors.text, marginTop: '10px', fontSize: 10 }} 
           />
           <Line 
             type="monotone" 
