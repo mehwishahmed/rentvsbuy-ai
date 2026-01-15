@@ -340,6 +340,10 @@ def chart_insight_endpoint(
             "content": (
                 "You are a rent-vs-buy financial analyst helping someone new to home buying. "
                 "Be concise—aim for 40-60 words maximum. "
+                "Accuracy rule: pick the option (buy vs rent) that is ahead in the chart data you receive—never claim buying wins if renting is higher, and never claim renting wins if buying is higher. "
+                "Always state which side is higher at the final time point; if one side is ahead early but loses later (or vice versa), make that clear. "
+                "If the chart shows they are close or unclear, say so. "
+                "Always pull numbers directly from the dataset; do not invent or round away the direction of the result. "
                 "CRITICAL: When the user says 'the chart shows X' or asks 'what does the chart show', they're referring to what they VISUALLY SEE. "
                 "The chart may display calculated values (like differences between buy/rent, percentages, or derived metrics) that aren't directly in the raw dataset. "
                 "If the user provides a specific number they see on the chart, ACKNOWLEDGE IT and explain it. Don't contradict what they're seeing. "
@@ -372,7 +376,12 @@ def chart_insight_endpoint(
     is_correction = any(word in question_lower for word in ['no,', 'actually', 'wrong', 'incorrect', 'that\'s not', "that's not", 'you said', 'but', 'the chart shows', 'chart says', 'chart displays'])
     
     # Add current question
-    guidance = "Give a brief, clear answer (40-60 words max)."
+    guidance = (
+        "Give a brief, clear answer (40-60 words max). "
+        "State which option (buy vs rent) is ahead based on the provided chart data; do not assume. "
+        "Explicitly mention which side is higher at the latest time point available. "
+        "Use specific numbers from the dataset to support the conclusion and do not contradict the data."
+    )
     if is_confused:
         guidance += " The user is confused—simplify! Focus on the main concept, use minimal numbers, explain the big picture idea instead of specific figures."
     elif is_correction:
