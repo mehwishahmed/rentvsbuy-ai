@@ -48,10 +48,10 @@ function App() {
             <button 
               className="banner-button"
               onClick={() => {
-                const helpButton = document.querySelector('[title="Replay the quick tutorial"]') as HTMLButtonElement;
+                const helpButton = document.querySelector('[data-tour-id="tour-trigger"]') as HTMLButtonElement;
                 if (helpButton) helpButton.click();
               }}
-              title="Replay the quick tutorial"
+              title="Show quick tips for this page"
             >
               Help
             </button>
