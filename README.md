@@ -1,4 +1,6 @@
-# RentVsBuy.ai 🏠 🌐 Live Demo: https://rentvsbuy.ai
+# RentVsBuy.ai 🏠
+
+## 🌐 Live Demo: https://rentvsbuy.ai
 
 An AI-powered financial advisor that helps you make informed decisions about whether to buy a house or keep renting. Get personalized insights through a conversational interface with interactive charts and downloadable reports.
 
